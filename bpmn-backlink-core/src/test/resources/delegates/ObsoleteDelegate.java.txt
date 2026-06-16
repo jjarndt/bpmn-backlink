@@ -1,0 +1,14 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+@CalledFrom("bpmn/processes/gone.bpmn")
+public class ObsoleteDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // no process references this delegate anymore
+    }
+}

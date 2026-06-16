@@ -1,0 +1,19 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * The outer type does not implement JavaDelegate; only a nested static class
+ * does. The annotation is written to the top-level type regardless, which is
+ * the documented behaviour (the indexer addresses the file's primary type).
+ */
+public class InnerClassDelegate {
+
+    public static class Inner implements JavaDelegate {
+        @Override
+        public void execute(DelegateExecution execution) {
+            execution.setVariable("inner", true);
+        }
+    }
+}

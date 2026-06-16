@@ -1,0 +1,14 @@
+package net.example.delegate;
+
+/**
+ * A concrete class implementing only a non-delegate interface. The scanner's
+ * matchesAny loop iterates over the declared type, finds no match and returns
+ * false, exercising the negative path of the membership check.
+ */
+public class PlainRunnable implements Runnable {
+
+    @Override
+    public void run() {
+        // nothing delegate-ish here
+    }
+}

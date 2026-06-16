@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_listeners"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="listenerProcess" isExecutable="true">
+    <bpmn:serviceTask id="task" name="Task with listeners"
+                      camunda:class="net.example.delegate.TaskDelegate">
+      <bpmn:extensionElements>
+        <camunda:executionListener event="start" class="net.example.listener.StartListener"/>
+        <camunda:taskListener event="create" delegateExpression="${createListenerBean}"/>
+      </bpmn:extensionElements>
+    </bpmn:serviceTask>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,17 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * A generic class declaration that implements JavaDelegate. The type
+ * parameter must survive the rewrite and the annotation must land on the
+ * type, before the {@code class} keyword.
+ */
+public class GenericDelegate<T extends Number> implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("generic", true);
+    }
+}

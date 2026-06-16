@@ -1,0 +1,16 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Uses Windows CRLF line endings. The rewrite must keep CRLF on every line,
+ * including the newly inserted import and annotation lines.
+ */
+public class CrlfDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("crlf", true);
+    }
+}

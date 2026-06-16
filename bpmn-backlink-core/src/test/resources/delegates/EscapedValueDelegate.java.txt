@@ -1,0 +1,18 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Carries an annotation value with escaped characters in the source. Reading
+ * must yield the decoded logical value, not the raw source between quotes.
+ */
+@CalledFrom("bpmn/a\\b\"q\".bpmn")
+public class EscapedValueDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // escaped annotation value
+    }
+}

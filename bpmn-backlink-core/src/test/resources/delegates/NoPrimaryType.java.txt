@@ -1,0 +1,18 @@
+package net.example.delegate;
+
+/**
+ * A compilation unit whose file name does not match any contained type and
+ * that has no public type, so JavaParser reports no primary type. This drives
+ * the fallback branch that picks the first declared type instead.
+ */
+class FirstHelper {
+    void a() {
+        // first declared type
+    }
+}
+
+class SecondHelper {
+    void b() {
+        // second declared type
+    }
+}

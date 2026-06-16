@@ -1,0 +1,14 @@
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * A compilation unit without a package declaration. The import must still be
+ * added and the annotation written above the type.
+ */
+public class NoPackageDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("nopackage", true);
+    }
+}

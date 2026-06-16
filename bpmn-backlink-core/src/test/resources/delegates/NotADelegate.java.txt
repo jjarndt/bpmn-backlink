@@ -1,0 +1,11 @@
+package net.example.delegate;
+
+/**
+ * A plain service class that is no delegate at all and must be ignored.
+ */
+public class NotADelegate {
+
+    public void doSomething() {
+        // nothing
+    }
+}

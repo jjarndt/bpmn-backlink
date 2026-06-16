@@ -1,0 +1,18 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Carries a normal annotation whose member pair is not named {@code value},
+ * so the reader must skip it and return no values.
+ */
+@CalledFrom(other = "bpmn/processes/ignored.bpmn")
+public class OtherPairDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // member pair is not "value"
+    }
+}

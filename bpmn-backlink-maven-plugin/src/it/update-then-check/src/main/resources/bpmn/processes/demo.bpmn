@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_demo" targetNamespace="http://example.com/bpmn">
+  <bpmn:process id="demoProcess" isExecutable="true">
+    <bpmn:startEvent id="start"/>
+    <bpmn:serviceTask id="runDemo" name="Run demo"
+                      camunda:class="com.example.DemoDelegate"/>
+    <bpmn:endEvent id="end"/>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="runDemo"/>
+    <bpmn:sequenceFlow id="f2" sourceRef="runDemo" targetRef="end"/>
+  </bpmn:process>
+</bpmn:definitions>

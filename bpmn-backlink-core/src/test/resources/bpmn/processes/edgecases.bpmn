@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_edge"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="edgeProcess" isExecutable="true">
+    <bpmn:startEvent id="start"/>
+    <bpmn:serviceTask id="emptyExpression" name="Empty delegate expression"
+                      camunda:delegateExpression="${}"/>
+    <bpmn:serviceTask id="blankClass" name="Blank class"
+                      camunda:class="   "/>
+    <bpmn:serviceTask id="dotOnlyClass" name="Class that decapitalizes to blank"
+                      camunda:class="."/>
+    <bpmn:serviceTask id="noDelegateAttributes" name="Plain task with neither attribute"/>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>

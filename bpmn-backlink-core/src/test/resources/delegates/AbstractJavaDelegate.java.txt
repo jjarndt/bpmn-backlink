@@ -1,0 +1,18 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Abstract base that must NOT be treated as a delegate even though it
+ * implements JavaDelegate, because it is abstract.
+ */
+public abstract class AbstractJavaDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        doExecute(execution);
+    }
+
+    protected abstract void doExecute(DelegateExecution execution);
+}

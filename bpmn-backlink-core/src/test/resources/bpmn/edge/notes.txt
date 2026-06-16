@@ -1,0 +1,2 @@
+This is not a BPMN file and must be ignored by the indexer.
+camunda:delegateExpression="${shouldNeverBeIndexed}"

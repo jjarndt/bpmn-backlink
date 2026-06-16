@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_shipping"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="shippingProcess" isExecutable="true">
+    <bpmn:startEvent id="start"/>
+    <bpmn:serviceTask id="reorder" name="Re-order"
+                      camunda:delegateExpression="${orderDelegate}"/>
+    <bpmn:serviceTask id="ship" name="Ship"
+                      camunda:delegateExpression="${shippingDelegate}"/>
+    <bpmn:endEvent id="end"/>
+    <bpmn:sequenceFlow id="f1" sourceRef="start" targetRef="reorder"/>
+    <bpmn:sequenceFlow id="f2" sourceRef="reorder" targetRef="ship"/>
+    <bpmn:sequenceFlow id="f3" sourceRef="ship" targetRef="end"/>
+  </bpmn:process>
+</bpmn:definitions>

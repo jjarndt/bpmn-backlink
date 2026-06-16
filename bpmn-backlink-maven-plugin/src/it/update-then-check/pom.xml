@@ -1,0 +1,75 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Example consumer project for the bpmn-backlink integration test.
+
+    The build runs two goals of the plugin under test in a single 'verify' run:
+      * update (process-sources): rewrites the delegate sources so their
+        @CalledFrom annotation matches the BPMN index.
+      * check  (verify):          re-derives the expected annotations without
+        writing and fails the build on any drift.
+
+    Because update runs first, check must find a clean, in-sync source tree.
+    All referenced artifacts (the plugin, bpmn-backlink-core, bpmn-backlink-
+    annotation) are staged by invoker:install, so the sub-build needs no network.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.jakobarndt.bpmnbacklink.it</groupId>
+    <artifactId>update-then-check</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+    </properties>
+
+    <dependencies>
+        <!-- Provides the @CalledFrom annotation that the plugin writes into the delegate. -->
+        <dependency>
+            <groupId>net.jakobarndt.bpmnbacklink</groupId>
+            <artifactId>bpmn-backlink-annotation</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+
+        <!-- The delegate implements org.camunda.bpm.engine.delegate.JavaDelegate. -->
+        <dependency>
+            <groupId>org.camunda.bpm</groupId>
+            <artifactId>camunda-engine</artifactId>
+            <version>7.23.0</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>net.jakobarndt.bpmnbacklink</groupId>
+                <artifactId>bpmn-backlink-maven-plugin</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <id>backlink-update</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>update</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>backlink-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <failOnDrift>true</failOnDrift>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

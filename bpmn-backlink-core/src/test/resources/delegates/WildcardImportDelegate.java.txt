@@ -1,0 +1,19 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.*;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Imports the annotation package via wildcard and uses the simple name.
+ * Updating must not introduce a redundant explicit import alongside the
+ * wildcard one.
+ */
+@CalledFrom("bpmn/processes/old.bpmn")
+public class WildcardImportDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // wildcard import of the annotation package
+    }
+}

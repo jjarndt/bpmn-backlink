@@ -1,0 +1,16 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * A record that implements JavaDelegate. Records are TypeDeclarations too, so
+ * the annotation must be writable onto the record header.
+ */
+public record RecordDelegate(String id) implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("record", id);
+    }
+}

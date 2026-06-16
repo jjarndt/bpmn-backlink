@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_same"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="sameProcess" isExecutable="true">
+    <bpmn:serviceTask id="viaExpression" name="Same delegate via delegateExpression"
+                      camunda:delegateExpression="${sharedDelegate}"/>
+    <bpmn:serviceTask id="viaClass" name="Same delegate via camunda:class"
+                      camunda:class="net.example.delegate.SharedDelegate"/>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>

@@ -1,0 +1,11 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * An interface that itself extends JavaDelegate. As an interface (not a
+ * concrete class) it must never be reported as a delegate type, exercising
+ * the isInterface() branch of the scanner.
+ */
+public interface DelegateInterface extends JavaDelegate {
+}

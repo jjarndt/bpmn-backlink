@@ -1,0 +1,20 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Hand-written annotation with unusual whitespace and a single value spread
+ * over its own line. A rewrite to the same value set must normalize it.
+ */
+@CalledFrom(
+        "bpmn/processes/order.bpmn"
+)
+public class HandFormattedDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // hand formatted annotation
+    }
+}

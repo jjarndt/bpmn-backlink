@@ -1,0 +1,11 @@
+﻿<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_bom"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="bomProcess" isExecutable="true">
+    <bpmn:serviceTask id="bom" name="Service task in a BOM-prefixed file"
+                      camunda:delegateExpression="${bomBean}"/>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>

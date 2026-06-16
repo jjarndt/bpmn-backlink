@@ -1,0 +1,23 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * The public primary type implements JavaDelegate and must be the one that
+ * gets annotated. A second, package-private top-level type must stay
+ * untouched.
+ */
+public class TwoTopLevelTypesDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("primary", true);
+    }
+}
+
+class CompanionHelper {
+    int helper() {
+        return 1;
+    }
+}

@@ -1,0 +1,23 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * A concrete class that implements two interfaces. The first one (Runnable)
+ * does not mark a delegate, so the scanner's matchesAny loop iterates past a
+ * non-matching declared type before finding JavaDelegate, exercising the
+ * "no match yet, keep looking" branch.
+ */
+public class RunnableDelegate implements Runnable, JavaDelegate {
+
+    @Override
+    public void run() {
+        // not a delegate concern
+    }
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("ran", true);
+    }
+}

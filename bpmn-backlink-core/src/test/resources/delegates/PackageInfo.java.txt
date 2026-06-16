@@ -1,0 +1,5 @@
+/**
+ * A package-info compilation unit that declares no type at all. Used to drive
+ * the "no top-level type" path of the annotation writer.
+ */
+package net.example.delegate;

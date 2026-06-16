@@ -1,0 +1,19 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Carries a single-member annotation whose value is not a string literal but
+ * a field access expression, so the value extractor encounters neither an
+ * array nor a string literal and adds nothing.
+ */
+@CalledFrom(Constants.PROCESS_PATH)
+public class NonStringValueDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // value is a constant reference, not a string literal
+    }
+}

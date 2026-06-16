@@ -1,0 +1,19 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Carries the annotation in the explicit normal form {@code value = {...}}
+ * rather than the single-member form, so the reader must extract the value
+ * pair by name.
+ */
+@CalledFrom(value = {"bpmn/processes/order.bpmn", "bpmn/processes/sub/shipping.bpmn"})
+public class NormalAnnotatedDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // annotated in normal form
+    }
+}

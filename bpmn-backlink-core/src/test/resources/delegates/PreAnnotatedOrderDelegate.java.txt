@@ -1,0 +1,17 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+@CalledFrom({
+    "bpmn/processes/order.bpmn",
+    "bpmn/processes/sub/shipping.bpmn"
+})
+public class OrderDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // already correctly annotated, must remain unchanged
+    }
+}

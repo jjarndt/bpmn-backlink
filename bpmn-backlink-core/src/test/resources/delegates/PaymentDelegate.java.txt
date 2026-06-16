@@ -1,0 +1,11 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+
+public class PaymentDelegate extends AbstractJavaDelegate {
+
+    @Override
+    protected void doExecute(DelegateExecution execution) {
+        execution.setVariable("paid", true);
+    }
+}

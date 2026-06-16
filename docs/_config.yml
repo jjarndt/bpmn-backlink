@@ -1,0 +1,6 @@
+theme: jekyll-theme-cayman
+title: bpmn-backlink
+description: >-
+  A Maven plugin that links Camunda 7 BPMN service tasks to their Java delegates
+  and records the mapping as @CalledFrom annotations in the delegate sources.
+show_downloads: false

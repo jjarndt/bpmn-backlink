@@ -1,0 +1,21 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Has a simple-name {@code @CalledFrom} on the type and a fully qualified
+ * {@code @net.jakobarndt.bpmnbacklink.annotation.CalledFrom} on a method.
+ * Removing the type annotation must keep the import because the fully
+ * qualified usage still references it by FQN.
+ */
+@CalledFrom("bpmn/processes/gone.bpmn")
+public class FqnRemainingDelegate implements JavaDelegate {
+
+    @net.jakobarndt.bpmnbacklink.annotation.CalledFrom("bpmn/processes/kept.bpmn")
+    @Override
+    public void execute(DelegateExecution execution) {
+        // fully qualified usage keeps the import in play
+    }
+}

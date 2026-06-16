@@ -1,0 +1,16 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Places an order. This Javadoc and the spacing below must survive a rewrite.
+ */
+public class OrderDelegate implements JavaDelegate {
+
+    // a deliberately oddly placed comment
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("ordered", true);
+    }
+}

@@ -1,0 +1,18 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * The type carries a fully qualified {@code @net.jakobarndt...CalledFrom}
+ * annotation and the file has no simple-name import for it. Updating must
+ * find and replace this annotation rather than adding a second one.
+ */
+@net.jakobarndt.bpmnbacklink.annotation.CalledFrom("bpmn/processes/old.bpmn")
+public class FqnTypeAnnotationDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // fully qualified type annotation, no import present
+    }
+}

@@ -1,0 +1,19 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * An enum that implements JavaDelegate. Enums are TypeDeclarations as well, so
+ * the annotation must land on the enum declaration without corrupting the
+ * constants.
+ */
+public enum EnumDelegate implements JavaDelegate {
+
+    INSTANCE;
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("enum", name());
+    }
+}

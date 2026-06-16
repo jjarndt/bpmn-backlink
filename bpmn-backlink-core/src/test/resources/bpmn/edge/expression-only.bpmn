@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_expr"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="exprProcess" isExecutable="true">
+    <bpmn:serviceTask id="expr" name="Plain expression, not a delegate"
+                      camunda:expression="${someBean.someMethod()}"/>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>

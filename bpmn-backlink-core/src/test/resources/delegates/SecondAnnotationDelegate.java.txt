@@ -1,0 +1,20 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Has the type-level {@code @CalledFrom} plus a second {@code @CalledFrom}
+ * on a method. Removing the type-level annotation must keep the import,
+ * because the method annotation still uses it.
+ */
+@CalledFrom("bpmn/processes/gone.bpmn")
+public class SecondAnnotationDelegate implements JavaDelegate {
+
+    @CalledFrom("bpmn/processes/other.bpmn")
+    @Override
+    public void execute(DelegateExecution execution) {
+        // method-level annotation keeps the import alive
+    }
+}

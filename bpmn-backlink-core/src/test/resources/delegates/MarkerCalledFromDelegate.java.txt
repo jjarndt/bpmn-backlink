@@ -1,0 +1,19 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Carries the annotation as a bare marker without parentheses, so it is
+ * neither a single-member nor a normal annotation expression. Reading it
+ * yields no values.
+ */
+@CalledFrom
+public class MarkerCalledFromDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        // marker annotation, no value
+    }
+}

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_prefixes"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="prefixProcess" isExecutable="true">
+    <bpmn:serviceTask id="dollar" name="Dollar prefix"
+                      camunda:delegateExpression="${dollarBean}"/>
+    <bpmn:serviceTask id="hash" name="Hash prefix"
+                      camunda:delegateExpression="#{hashBean}"/>
+    <bpmn:serviceTask id="plain" name="No wrapper"
+                      camunda:delegateExpression="plainBean"/>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>

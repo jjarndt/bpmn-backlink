@@ -1,0 +1,26 @@
+package net.example.delegate;
+
+import static java.lang.Math.PI;
+
+import java.util.List;
+import java.util.*;
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Mixes a static import and an asterisk import alongside the annotation
+ * import. When the annotation is removed, the import filter must evaluate
+ * every import (static and asterisk included) and only drop the exact,
+ * non-static, non-asterisk annotation import.
+ */
+@CalledFrom("bpmn/processes/gone.bpmn")
+public class MixedImportsDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        List<Object> ignored = new ArrayList<>();
+        execution.setVariable("pi", PI);
+        execution.setVariable("size", ignored.size());
+    }
+}

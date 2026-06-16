@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_other"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="otherProcess" isExecutable="true">
+    <bpmn:sendTask id="send" name="Send"
+                   camunda:class="net.example.delegate.SendDelegate"/>
+    <bpmn:businessRuleTask id="rule" name="Rule"
+                           camunda:delegateExpression="${ruleBean}"/>
+    <bpmn:endEvent id="end">
+      <bpmn:messageEventDefinition id="msg"
+                                   camunda:class="net.example.delegate.MessageDelegate"/>
+    </bpmn:endEvent>
+  </bpmn:process>
+</bpmn:definitions>

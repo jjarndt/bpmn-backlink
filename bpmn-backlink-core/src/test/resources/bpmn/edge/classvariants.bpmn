@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<bpmn:definitions xmlns:bpmn="http://www.omg.org/spec/BPMN/20100524/MODEL"
+                  xmlns:camunda="http://camunda.org/schema/1.0/bpmn"
+                  id="defs_classvariants"
+                  targetNamespace="http://example.net/bpmn">
+  <bpmn:process id="classProcess" isExecutable="true">
+    <bpmn:serviceTask id="spaced" name="Class with surrounding whitespace"
+                      camunda:class="   net.example.delegate.SpacedDelegate   "/>
+    <bpmn:serviceTask id="nested" name="Deeply nested package"
+                      camunda:class="net.example.deeply.nested.pkg.NestedDelegate"/>
+    <bpmn:serviceTask id="defaultpkg" name="Default package, no dot"
+                      camunda:class="DefaultPackageDelegate"/>
+    <bpmn:endEvent id="end"/>
+  </bpmn:process>
+</bpmn:definitions>
