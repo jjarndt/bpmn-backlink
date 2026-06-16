@@ -1,4 +1,15 @@
+<div align="center">
+
 # bpmn-backlink
+
+#### Navigable backlinks from Camunda&nbsp;7 delegate code to the BPMN processes that call it — written into your sources and maintained at build time.
+
+[![Maven Central](https://img.shields.io/maven-central/v/net.jakobarndt.bpmnbacklink/bpmn-backlink-maven-plugin?style=flat-square&logo=apachemaven&label=Maven%20Central&color=blue)](https://central.sonatype.com/artifact/net.jakobarndt.bpmnbacklink/bpmn-backlink-maven-plugin)
+[![CI](https://img.shields.io/github/actions/workflow/status/jjarndt/bpmn-backlink/ci.yml?branch=main&style=flat-square&logo=githubactions&logoColor=white&label=CI)](https://github.com/jjarndt/bpmn-backlink/actions/workflows/ci.yml)
+[![License](https://img.shields.io/badge/License-Apache%202.0-blue?style=flat-square)](LICENSE)
+[![Java](https://img.shields.io/badge/Java-17%2B-orange?style=flat-square&logo=openjdk&logoColor=white)](#requirements)
+
+</div>
 
 A Maven plugin that links Camunda 7 BPMN service tasks to their Java delegates and records
 the mapping as a `@CalledFrom` annotation directly in the delegate source files.
@@ -9,6 +20,25 @@ process files reference the delegate, either via `delegateExpression="${beanName
 annotation. This gives you navigable backlinks from delegate code to the processes that use
 it, without runtime cost. The annotation is maintained idempotently: a second run produces
 no diff, and delegates that are no longer referenced have the annotation removed again.
+
+## See it
+
+The `update` goal rewrites each delegate, recording the processes that call it:
+
+<table>
+  <tr>
+    <td align="center"><b>Before</b></td>
+    <td align="center"><b>After</b></td>
+  </tr>
+  <tr>
+    <td valign="top"><img src="docs/img/delegate-before.png" alt="Delegate before bpmn-backlink" width="430"/></td>
+    <td valign="top"><img src="docs/img/delegate-after.png" alt="Delegate after bpmn-backlink, annotated with @CalledFrom" width="470"/></td>
+  </tr>
+</table>
+
+It runs as part of your build — idempotent, no runtime cost:
+
+<p align="center"><img src="docs/img/terminal.png" alt="bpmn-backlink running during mvn process-sources" width="640"/></p>
 
 ## Modules
 
@@ -34,17 +64,20 @@ artifact has to be on the compile classpath:
 <dependency>
     <groupId>net.jakobarndt.bpmnbacklink</groupId>
     <artifactId>bpmn-backlink-annotation</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
 </dependency>
 ```
 
-Then add the plugin to the same module:
+Then add the plugin to the same module — bind `update` to keep the annotations in sync and
+`check` to fail the build when they drift:
+
+<p align="center"><img src="docs/img/pom.png" alt="bpmn-backlink-maven-plugin configuration in pom.xml" width="640"/></p>
 
 ```xml
 <plugin>
     <groupId>net.jakobarndt.bpmnbacklink</groupId>
     <artifactId>bpmn-backlink-maven-plugin</artifactId>
-    <version>0.1.0-SNAPSHOT</version>
+    <version>0.1.0</version>
     <executions>
         <!-- Keep the @CalledFrom annotations in sync during the build. -->
         <execution>
