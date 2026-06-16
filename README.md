@@ -11,34 +11,15 @@
 
 </div>
 
-A Maven plugin that links Camunda 7 BPMN service tasks to their Java delegates and records
-the mapping as a `@CalledFrom` annotation directly in the delegate source files.
+<p align="center">
+  A Maven plugin for Camunda&nbsp;7 that writes a <code>@CalledFrom</code> annotation into each Java
+  delegate, recording the BPMN processes that call it — navigable backlinks with zero runtime
+  cost, kept in sync on every build.
+</p>
 
-For each `JavaDelegate` (or `AbstractJavaDelegate` subclass) it determines which BPMN
-process files reference the delegate, either via `delegateExpression="${beanName}"` or via
-`camunda:class="a.b.C"`, and writes the sorted list of BPMN paths into a `@CalledFrom`
-annotation. This gives you navigable backlinks from delegate code to the processes that use
-it, without runtime cost. The annotation is maintained idempotently: a second run produces
-no diff, and delegates that are no longer referenced have the annotation removed again.
+<p align="center"><img src="docs/img/hero.png" alt="A delegate before and after bpmn-backlink: the update goal adds a @CalledFrom annotation listing the BPMN processes that call it" width="920"/></p>
 
-## See it
-
-The `update` goal rewrites each delegate, recording the processes that call it:
-
-<table>
-  <tr>
-    <td align="center"><b>Before</b></td>
-    <td align="center"><b>After</b></td>
-  </tr>
-  <tr>
-    <td valign="top"><img src="docs/img/delegate-before.png" alt="Delegate before bpmn-backlink" width="430"/></td>
-    <td valign="top"><img src="docs/img/delegate-after.png" alt="Delegate after bpmn-backlink, annotated with @CalledFrom" width="470"/></td>
-  </tr>
-</table>
-
-It runs as part of your build — idempotent, no runtime cost:
-
-<p align="center"><img src="docs/img/terminal.png" alt="bpmn-backlink running during mvn process-sources" width="640"/></p>
+<p align="center"><img src="docs/img/terminal.png" alt="bpmn-backlink running during mvn process-sources" width="620"/></p>
 
 ## Modules
 
