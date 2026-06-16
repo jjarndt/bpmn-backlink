@@ -70,6 +70,11 @@
         <maven-gpg-plugin.version>3.2.8</maven-gpg-plugin.version>
         <central-publishing-maven-plugin.version>0.10.0</central-publishing-maven-plugin.version>
 
+        <!-- Central Portal publishing behaviour. Defaults stage only (safe for local
+             deploys); the release pipeline overrides both to publish automatically. -->
+        <central.autoPublish>false</central.autoPublish>
+        <central.waitUntil>uploaded</central.waitUntil>
+
         <!-- Coverage gate: 100% line and branch per module bundle. -->
         <jacoco.line.ratio>1.00</jacoco.line.ratio>
         <jacoco.branch.ratio>1.00</jacoco.branch.ratio>
@@ -258,6 +263,14 @@
                                 <goals>
                                     <goal>sign</goal>
                                 </goals>
+                                <configuration>
+                                    <!-- Sign non-interactively in CI (no TTY); the key is
+                                         passphrase-less, so loopback never prompts. -->
+                                    <gpgArguments>
+                                        <arg>--pinentry-mode</arg>
+                                        <arg>loopback</arg>
+                                    </gpgArguments>
+                                </configuration>
                             </execution>
                         </executions>
                     </plugin>
@@ -268,7 +281,9 @@
                         <extensions>true</extensions>
                         <configuration>
                             <publishingServerId>central</publishingServerId>
-                            <autoPublish>false</autoPublish>
+                            <!-- Local deploy stages only; CI passes -Dcentral.autoPublish=true. -->
+                            <autoPublish>${central.autoPublish}</autoPublish>
+                            <waitUntil>${central.waitUntil}</waitUntil>
                         </configuration>
                     </plugin>
                 </plugins>
