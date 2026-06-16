@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-06-16
+
 ### Added
 
 - Initial release of `bpmn-backlink`, a Maven plugin that links Camunda 7 BPMN
@@ -28,4 +30,5 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - 100% line and branch coverage gate (JaCoCo) per module, a maven-invoker
   integration test, and a GitHub Actions CI workflow running `mvn verify`.
 
-[Unreleased]: https://github.com/jjarndt/bpmn-backlink/commits/main
+[Unreleased]: https://github.com/jjarndt/bpmn-backlink/compare/v0.1.0...HEAD
+[0.1.0]: https://github.com/jjarndt/bpmn-backlink/releases/tag/v0.1.0
