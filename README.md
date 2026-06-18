@@ -11,35 +11,13 @@
 
 </div>
 
-<p align="center">
-  A Maven plugin for Camunda&nbsp;7 that writes a <code>@CalledFrom</code> annotation into each Java
-  delegate, recording the BPMN processes that call it — navigable backlinks with zero runtime
-  cost, kept in sync on every build.
-</p>
-
 <p align="center"><img src="docs/img/hero.png" alt="A delegate before and after bpmn-backlink: the update goal adds a @CalledFrom annotation listing the BPMN processes that call it" width="920"/></p>
 
 <p align="center"><img src="docs/img/terminal.png" alt="bpmn-backlink running during mvn process-sources" width="620"/></p>
 
-## Modules
-
-- `bpmn-backlink-annotation` — the `@CalledFrom` annotation.
-- `bpmn-backlink-core` — the engine: BPMN indexing (BPMN Model API), delegate scanning and
-  annotation writing (JavaParser). No Maven dependency.
-- `bpmn-backlink-maven-plugin` — the Maven plugin exposing the `update` and `check` goals.
-
-## Goals
-
-- `bpmn-backlink:update` — writes/refreshes the `@CalledFrom` annotations. Bound to the
-  `process-sources` phase by default.
-- `bpmn-backlink:check` — verifies the annotations are up to date without writing. Bound to
-  the `verify` phase by default; fails the build on drift (configurable via `failOnDrift`).
-
 ## Quickstart
 
-First add the annotation dependency to the module that contains your delegates. The plugin
-writes `import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;` into the sources, so this
-artifact has to be on the compile classpath:
+Add the annotation dependency to the module with your delegates, so the generated import compiles:
 
 ```xml
 <dependency>
@@ -49,8 +27,7 @@ artifact has to be on the compile classpath:
 </dependency>
 ```
 
-Then add the plugin to the same module — bind `update` to keep the annotations in sync and
-`check` to fail the build when they drift:
+Then add the plugin to the same module:
 
 <p align="center"><img src="docs/img/pom.png" alt="bpmn-backlink-maven-plugin configuration in pom.xml" width="640"/></p>
 
@@ -80,21 +57,6 @@ Then add the plugin to the same module — bind `update` to keep the annotations
 </plugin>
 ```
 
-### Configuration
-
-All parameters have sensible defaults and can be overridden:
-
-| Parameter           | Default                                              | Goals          |
-|---------------------|------------------------------------------------------|----------------|
-| `sourceDirectory`   | `${project.build.sourceDirectory}`                   | update, check  |
-| `bpmnDirectory`     | `${project.basedir}/src/main/resources/bpmn/processes` | update, check |
-| `bpmnReferenceRoot` | `${project.basedir}/src/main/resources`              | update, check  |
-| `skip`              | `false`                                              | update, check  |
-| `failOnDrift`       | `true`                                               | check          |
-
-BPMN paths are stored relative to `bpmnReferenceRoot` using `/` separators, so they line up
-with classpath-relative deployment paths and stay navigable from the IDE.
-
 ## What it produces
 
 Given a service task `<serviceTask camunda:class="com.example.OrderDelegate"/>` in
@@ -111,8 +73,29 @@ public class OrderDelegate implements JavaDelegate {
 
 A delegate referenced from several processes gets a sorted, multi-valued annotation
 (`@CalledFrom({ "a.bpmn", "b.bpmn" })`). Source formatting and comments outside the
-annotation are preserved, because the rewrite uses JavaParser with `LexicalPreservingPrinter`
-rather than text substitution.
+annotation are preserved.
+
+## Configuration
+
+All parameters have sensible defaults and can be overridden:
+
+| Parameter           | Default                                              | Goals          |
+|---------------------|------------------------------------------------------|----------------|
+| `sourceDirectory`   | `${project.build.sourceDirectory}`                   | update, check  |
+| `bpmnDirectory`     | `${project.basedir}/src/main/resources/bpmn/processes` | update, check |
+| `bpmnReferenceRoot` | `${project.basedir}/src/main/resources`              | update, check  |
+| `skip`              | `false`                                              | update, check  |
+| `failOnDrift`       | `true`                                               | check          |
+
+BPMN paths are stored relative to `bpmnReferenceRoot` using `/` separators, so they line up
+with classpath-relative deployment paths and stay navigable from the IDE.
+
+## Goals
+
+- `bpmn-backlink:update` — writes/refreshes the `@CalledFrom` annotations. Bound to the
+  `process-sources` phase by default.
+- `bpmn-backlink:check` — verifies the annotations are up to date without writing. Bound to
+  the `verify` phase by default; fails the build on drift (configurable via `failOnDrift`).
 
 ## Scope
 
@@ -125,8 +108,7 @@ Version 0.1.0 targets Camunda 7 and the element-to-code relation only:
   listeners, send tasks, business-rule tasks, message event definitions, ...). `camunda:expression`
   is not a delegate and is ignored.
 - Out of scope for now: external-task topics, call activities (process-to-process), and
-  Camunda 8 (`@JobWorker`). The core keeps the reference type abstract, so these can be added
-  later without a redesign.
+  Camunda 8 (`@JobWorker`).
 
 ## Requirements
 
@@ -134,16 +116,22 @@ Version 0.1.0 targets Camunda 7 and the element-to-code relation only:
 - Maven 3.9+
 - Camunda 7 (the consuming project provides `camunda-engine`)
 
+## Modules
+
+- `bpmn-backlink-annotation` — the `@CalledFrom` annotation.
+- `bpmn-backlink-core` — the engine: BPMN indexing (BPMN Model API), delegate scanning and
+  annotation writing (JavaParser). No Maven dependency.
+- `bpmn-backlink-maven-plugin` — the Maven plugin exposing the `update` and `check` goals.
+
 ## Building
 
 ```bash
 mvn verify
 ```
 
-This runs all unit tests, the maven-invoker integration test (`update` then `check` against a
-sample project), and the JaCoCo coverage gate. The build enforces 100% line and branch
-coverage per module. Continuous integration runs the same `mvn verify` on every push and pull
-request to `main` via GitHub Actions.
+This runs the unit tests, a maven-invoker integration test (`update` then `check` against a
+sample project), and the JaCoCo coverage gate (100% line and branch per module). CI runs the
+same on every push and pull request to `main`.
 
 ## License
 
