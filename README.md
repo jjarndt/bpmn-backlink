@@ -11,9 +11,11 @@
 
 </div>
 
-<p align="center"><img src="docs/img/hero.png" alt="A delegate before and after bpmn-backlink: the update goal adds a @CalledFrom annotation listing the BPMN processes that call it" width="920"/></p>
+<p align="center"><img src="docs/img/delegate-before.png" alt="A Camunda delegate before bpmn-backlink" width="680"/></p>
 
-<p align="center"><img src="docs/img/terminal.png" alt="bpmn-backlink running during mvn process-sources" width="620"/></p>
+<p align="center"><sub><code>mvn process-sources</code> &nbsp;↓&nbsp; <code>bpmn-backlink:update</code></sub></p>
+
+<p align="center"><img src="docs/img/delegate-after.png" alt="The same delegate after bpmn-backlink: a @CalledFrom annotation lists the BPMN processes that call it" width="680"/></p>
 
 ## Quickstart
 
@@ -28,8 +30,6 @@ Add the annotation dependency to the module with your delegates, so the generate
 ```
 
 Then add the plugin to the same module:
-
-<p align="center"><img src="docs/img/pom.png" alt="bpmn-backlink-maven-plugin configuration in pom.xml" width="640"/></p>
 
 ```xml
 <plugin>
@@ -59,21 +59,10 @@ Then add the plugin to the same module:
 
 ## What it produces
 
-Given a service task `<serviceTask camunda:class="com.example.OrderDelegate"/>` in
-`src/main/resources/bpmn/processes/order.bpmn`, the `update` goal rewrites the delegate:
-
-```java
-import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
-
-@CalledFrom("bpmn/processes/order.bpmn")
-public class OrderDelegate implements JavaDelegate {
-    ...
-}
-```
-
-A delegate referenced from several processes gets a sorted, multi-valued annotation
-(`@CalledFrom({ "a.bpmn", "b.bpmn" })`). Source formatting and comments outside the
-annotation are preserved.
+The `update` goal records which BPMN processes reference each delegate in a `@CalledFrom`
+annotation — the before/after shown above. A delegate called from several processes gets a
+sorted, multi-valued annotation, `@CalledFrom({ "a.bpmn", "b.bpmn" })`; existing formatting
+and comments are left untouched.
 
 ## Configuration
 
@@ -104,9 +93,8 @@ Version 0.1.0 targets Camunda 7 and the element-to-code relation only:
 - Detected delegates: concrete classes implementing `JavaDelegate` or extending
   `AbstractJavaDelegate`.
 - Detected references: `camunda:delegateExpression` (`${bean}` or `#{bean}`) and
-  `camunda:class` on any BPMN element that carries them (service tasks, execution/task
-  listeners, send tasks, business-rule tasks, message event definitions, ...). `camunda:expression`
-  is not a delegate and is ignored.
+  `camunda:class`, on any BPMN element that carries them. `camunda:expression` is not a
+  delegate and is ignored.
 - Out of scope for now: external-task topics, call activities (process-to-process), and
   Camunda 8 (`@JobWorker`).
 
