@@ -11,11 +11,7 @@
 
 </div>
 
-<p align="center"><img src="docs/img/delegate-before.png" alt="A Camunda delegate before bpmn-backlink" width="680"/></p>
-
-<p align="center"><sub><code>mvn process-sources</code> &nbsp;↓&nbsp; <code>bpmn-backlink:update</code></sub></p>
-
-<p align="center"><img src="docs/img/delegate-after.png" alt="The same delegate after bpmn-backlink: a @CalledFrom annotation lists the BPMN processes that call it" width="680"/></p>
+<p align="center"><img src="docs/img/hero.png" alt="A Camunda delegate before and after bpmn-backlink: the update goal adds a @CalledFrom annotation listing the BPMN processes that call it" width="620"/></p>
 
 ## Quickstart
 
