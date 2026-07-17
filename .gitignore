@@ -24,6 +24,10 @@ buildNumber.properties
 .mvn/timing.properties
 .mvn/wrapper/maven-wrapper.jar
 
+# Gradle
+.gradle/
+build/
+
 # Compiled output
 *.class
 
