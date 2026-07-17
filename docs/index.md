@@ -28,7 +28,7 @@ A delegate referenced from several processes gets a sorted, multi-valued annotat
 (`@CalledFrom({ "a.bpmn", "b.bpmn" })`). The rewrite is idempotent: a second run produces no
 diff, and delegates that are no longer referenced have the annotation removed again.
 
-## Quickstart
+## Quickstart (Maven)
 
 Add the annotation dependency to the module with your delegates, then bind the plugin's
 `update` and `check` goals:
@@ -59,6 +59,22 @@ Add the annotation dependency to the module with your delegates, then bind the p
         </execution>
     </executions>
 </plugin>
+```
+
+## Quickstart (Gradle)
+
+Apply the plugin and add the annotation dependency — `bpmnBacklinkUpdate` then runs
+automatically before `compileJava`, and `bpmnBacklinkCheck` is attached to `check`:
+
+```kotlin
+plugins {
+    java
+    id("net.jakobarndt.bpmnbacklink") version "0.2.0"
+}
+
+dependencies {
+    implementation("net.jakobarndt.bpmnbacklink:bpmn-backlink-annotation:0.2.0")
+}
 ```
 
 Full documentation — configuration parameters, scope, and goals — lives in the
