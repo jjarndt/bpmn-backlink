@@ -1,6 +1,7 @@
 name: Release to Maven Central
 
-# Publishes the project to Maven Central via the Sonatype Central Portal.
+# Publishes the Maven modules to Maven Central via the Sonatype Central Portal,
+# then the Gradle plugin to the Gradle Plugin Portal and to Maven Central.
 #
 # Trigger: push a tag like `v0.2.0` on a commit whose POM version is the matching
 # release version (no -SNAPSHOT — the Central Portal rejects snapshots), or run
@@ -13,9 +14,11 @@ name: Release to Maven Central
 #   git push origin main --tags
 #
 # Required repository secrets (Settings -> Secrets and variables -> Actions):
-#   CENTRAL_USERNAME  - Sonatype Central Portal user token name
-#   CENTRAL_PASSWORD  - Sonatype Central Portal user token password
-#   GPG_PRIVATE_KEY   - ASCII-armored, passphrase-less GPG private signing key
+#   CENTRAL_USERNAME      - Sonatype Central Portal user token name
+#   CENTRAL_PASSWORD      - Sonatype Central Portal user token password
+#   GPG_PRIVATE_KEY       - ASCII-armored, passphrase-less GPG private signing key
+#   GRADLE_PUBLISH_KEY    - Gradle Plugin Portal API key
+#   GRADLE_PUBLISH_SECRET - Gradle Plugin Portal API secret
 
 on:
   push:
@@ -72,3 +75,28 @@ jobs:
         env:
           MAVEN_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
           MAVEN_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+
+      # The Gradle steps below are additive: the Maven release above is already
+      # complete, so a Gradle failure cannot damage it. The Gradle plugin build
+      # consumes the release version of bpmn-backlink-core from mavenLocal
+      # instead of waiting for the Central sync.
+      - name: Stage the release version in mavenLocal for the Gradle build
+        run: mvn -B -ntp -DskipTests install
+
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+
+      - name: Publish to the Gradle Plugin Portal
+        run: ./gradlew publishPlugins
+        working-directory: bpmn-backlink-gradle-plugin
+        env:
+          GRADLE_PUBLISH_KEY: ${{ secrets.GRADLE_PUBLISH_KEY }}
+          GRADLE_PUBLISH_SECRET: ${{ secrets.GRADLE_PUBLISH_SECRET }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}
+
+      - name: Publish the Gradle plugin to Maven Central
+        run: ./gradlew publishAggregationToCentralPortal
+        working-directory: bpmn-backlink-gradle-plugin
+        env:
+          CENTRAL_USERNAME: ${{ secrets.CENTRAL_USERNAME }}
+          CENTRAL_PASSWORD: ${{ secrets.CENTRAL_PASSWORD }}
+          GPG_PRIVATE_KEY: ${{ secrets.GPG_PRIVATE_KEY }}

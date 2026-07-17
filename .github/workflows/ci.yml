@@ -21,3 +21,9 @@ jobs:
           cache: maven
       - name: Build, test and verify (incl. coverage gate)
         run: mvn -B -ntp verify
+      - name: Stage core and annotation in mavenLocal for the Gradle build
+        run: mvn -B -ntp -DskipTests install
+      - uses: gradle/actions/setup-gradle@748248ddd2a24f49513d8f472f81c3a07d4d50e1 # v4.4.4
+      - name: Build and test the Gradle plugin (incl. coverage gate)
+        run: ./gradlew build
+        working-directory: bpmn-backlink-gradle-plugin
