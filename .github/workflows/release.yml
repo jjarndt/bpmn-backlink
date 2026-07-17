@@ -4,7 +4,9 @@ name: Release to Maven Central
 #
 # Trigger: push a tag like `v0.2.0` on a commit whose POM version is the matching
 # release version (no -SNAPSHOT — the Central Portal rejects snapshots), or run
-# the workflow manually. Typical release flow:
+# the workflow manually from such a tag. A guard step fails the run before any
+# secret is used when the ref is not a `v*` tag or the tag does not match the
+# POM version. Typical release flow:
 #
 #   mvn versions:set -DnewVersion=0.2.0 -DgenerateBackupPoms=false
 #   git commit -am "chore(release): 0.2.0" && git tag v0.2.0
@@ -26,9 +28,30 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4.3.1
 
-      - uses: actions/setup-java@v4
+      # Runs before setup-java so no secret reaches the runner on a bad ref.
+      - name: Verify ref is a release tag matching the POM version
+        run: |
+          if [ "$GITHUB_REF_TYPE" != "tag" ]; then
+            echo "::error::Release must run from a v* tag, got $GITHUB_REF"
+            exit 1
+          fi
+          case "$GITHUB_REF_NAME" in
+            v*) ;;
+            *)
+              echo "::error::Release tag must start with v, got $GITHUB_REF_NAME"
+              exit 1
+              ;;
+          esac
+          tag_version="${GITHUB_REF_NAME#v}"
+          pom_version=$(python3 -c "import xml.etree.ElementTree as ET; print(ET.parse('pom.xml').getroot().find('{http://maven.apache.org/POM/4.0.0}version').text)")
+          if [ "$tag_version" != "$pom_version" ]; then
+            echo "::error::Tag $GITHUB_REF_NAME does not match POM version $pom_version"
+            exit 1
+          fi
+
+      - uses: actions/setup-java@c1e323688fd81a25caa38c78aa6df2d33d3e20d9 # v4.8.0
         with:
           distribution: temurin
           java-version: '17'
