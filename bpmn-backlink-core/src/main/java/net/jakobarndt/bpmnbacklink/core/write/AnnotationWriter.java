@@ -47,7 +47,8 @@ import java.util.stream.Stream;
  * <p>The type is addressed by its simple name and looked up across the whole
  * compilation unit, so a nested type and every top-level type of a file are
  * reachable. If several types of a file share the simple name, the first one in
- * source order is used.
+ * source order is used; any further type of that name is then left untouched
+ * and reported as already correct.
  *
  * <p>All operations are idempotent: applying the same expected value twice
  * produces no second change.
