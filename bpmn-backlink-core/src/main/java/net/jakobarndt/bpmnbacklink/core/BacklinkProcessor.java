@@ -22,7 +22,6 @@ import net.jakobarndt.bpmnbacklink.core.write.AnnotationWriter;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
-import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;

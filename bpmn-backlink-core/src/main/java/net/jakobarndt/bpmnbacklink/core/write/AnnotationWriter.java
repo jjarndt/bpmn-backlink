@@ -18,7 +18,6 @@ package net.jakobarndt.bpmnbacklink.core.write;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.ImportDeclaration;
-import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.TypeDeclaration;
 import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.ArrayInitializerExpr;
@@ -158,8 +157,7 @@ public final class AnnotationWriter {
         if (stillUsed) {
             return;
         }
-        NodeList<ImportDeclaration> imports = unit.getImports();
-        imports.removeIf(this::isAnnotationImport);
+        unit.getImports().removeIf(this::isAnnotationImport);
     }
 
     private boolean isAnnotationImport(ImportDeclaration importDeclaration) {
