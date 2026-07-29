@@ -182,6 +182,32 @@ class AnnotationWriterHardeningTest {
     }
 
     @Test
+    void secondIdenticalUpdateOfANestedTypeIsByteIdentical(@TempDir Path root) throws IOException {
+        Path file = copy(root, "InnerClassDelegate", "InnerClassDelegate.java");
+
+        writer.write(file, "Inner", List.of("bpmn/processes/order.bpmn"));
+        byte[] afterFirst = readBytes(file);
+        writer.write(file, "Inner", List.of("bpmn/processes/order.bpmn"));
+        byte[] afterSecond = readBytes(file);
+
+        assertEquals(new String(afterFirst, StandardCharsets.UTF_8),
+            new String(afterSecond, StandardCharsets.UTF_8),
+            "a second identical update of a nested type must be byte-identical");
+    }
+
+    @Test
+    void updatingTheAnnotationOfANestedTypeKeepsItsIndentation(@TempDir Path root) throws IOException {
+        Path file = copy(root, "InnerClassDelegate", "InnerClassDelegate.java");
+
+        writer.write(file, "Inner", List.of("bpmn/processes/order.bpmn"));
+        writer.write(file, "Inner", List.of("bpmn/processes/sub/shipping.bpmn"));
+
+        String content = read(file);
+        assertTrue(content.contains("    @CalledFrom(\"bpmn/processes/sub/shipping.bpmn\")\n    public static class Inner"),
+            "the replaced annotation must keep the indentation of the nested type:\n" + content);
+    }
+
+    @Test
     void normalizingHandFormattedAnnotationIsIdempotent(@TempDir Path root) throws IOException {
         Path file = copy(root, "HandFormattedDelegate", "HandFormattedDelegate.java");
 

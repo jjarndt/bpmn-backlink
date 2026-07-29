@@ -99,12 +99,19 @@ public final class AnnotationWriter {
         TypeDeclaration<?> type = findType(unit, typeName)
             .orElseThrow(() -> new IllegalStateException("No type " + typeName + " in " + javaFile));
 
-        type.getAnnotationByName(ANNOTATION_SIMPLE_NAME).ifPresent(AnnotationExpr::remove);
+        Optional<AnnotationExpr> current = type.getAnnotationByName(ANNOTATION_SIMPLE_NAME);
 
         if (expected.isEmpty()) {
+            current.ifPresent(AnnotationExpr::remove);
             removeImportIfUnused(unit);
         } else {
-            type.addAnnotation(buildAnnotation(expected));
+            AnnotationExpr annotation = buildAnnotation(expected);
+            if (current.isPresent()) {
+                // Replacing in place keeps the indentation of the annotated type.
+                current.get().replace(annotation);
+            } else {
+                type.addAnnotation(annotation);
+            }
             ensureImport(unit);
         }
 
