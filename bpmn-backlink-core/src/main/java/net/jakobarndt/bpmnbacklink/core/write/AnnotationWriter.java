@@ -42,8 +42,13 @@ import java.util.stream.Stream;
 
 /**
  * Reads and rewrites the {@code @CalledFrom} annotation of a single delegate
- * source file with JavaParser and the {@link LexicalPreservingPrinter}, so that
- * the rest of the file keeps its original formatting and comments.
+ * type with JavaParser and the {@link LexicalPreservingPrinter}, so that the
+ * rest of the file keeps its original formatting and comments.
+ *
+ * <p>The type is addressed by its simple name and looked up across the whole
+ * compilation unit, so a nested type and every top-level type of a file are
+ * reachable. If several types of a file share the simple name, the first one in
+ * source order is used.
  *
  * <p>All operations are idempotent: applying the same expected value twice
  * produces no second change.
@@ -58,38 +63,42 @@ public final class AnnotationWriter {
 
     /**
      * Reads the BPMN paths currently stored in the {@code @CalledFrom}
-     * annotation of the top-level type in the given source file.
+     * annotation of the named type in the given source file.
      *
      * @param javaFile the delegate source file
-     * @return the values found, in source order; an empty list if the
-     *     annotation is absent or carries no value
+     * @param typeName the simple name of the delegate type
+     * @return the values found, in source order; an empty list if the type or
+     *     the annotation is absent or the annotation carries no value
      * @throws IOException if the file cannot be read
      */
-    public List<String> readCurrentValues(Path javaFile) throws IOException {
+    public List<String> readCurrentValues(Path javaFile, String typeName) throws IOException {
         CompilationUnit unit = parse(javaFile);
-        return findTopLevelType(unit)
+        return findType(unit, typeName)
             .flatMap(type -> type.getAnnotationByName(ANNOTATION_SIMPLE_NAME))
             .map(AnnotationWriter::extractValues)
             .orElseGet(ArrayList::new);
     }
 
     /**
-     * Rewrites the annotation of the given file to carry exactly the expected
+     * Rewrites the annotation of the named type to carry exactly the expected
      * values, preserving the rest of the file.
      *
      * <p>An empty {@code expected} list removes the annotation (and the import,
-     * if it then becomes unused). Calling this method when the file already
-     * matches still rewrites the file content identically; callers that care
-     * about idempotency should guard with {@link #readCurrentValues(Path)}.
+     * if no other type of the file still uses it). Calling this method when the
+     * type already matches still rewrites the file content identically; callers
+     * that care about idempotency should guard with
+     * {@link #readCurrentValues(Path, String)}.
      *
      * @param javaFile the delegate source file
+     * @param typeName the simple name of the delegate type
      * @param expected the desired BPMN paths (assumed already sorted)
      * @throws IOException if the file cannot be read or written
+     * @throws IllegalStateException if the file declares no such type
      */
-    public void write(Path javaFile, List<String> expected) throws IOException {
+    public void write(Path javaFile, String typeName, List<String> expected) throws IOException {
         CompilationUnit unit = parse(javaFile);
-        TypeDeclaration<?> type = findTopLevelType(unit)
-            .orElseThrow(() -> new IllegalStateException("No top-level type in " + javaFile));
+        TypeDeclaration<?> type = findType(unit, typeName)
+            .orElseThrow(() -> new IllegalStateException("No type " + typeName + " in " + javaFile));
 
         type.getAnnotationByName(ANNOTATION_SIMPLE_NAME).ifPresent(AnnotationExpr::remove);
 
@@ -109,11 +118,11 @@ public final class AnnotationWriter {
         return LexicalPreservingPrinter.setup(unit);
     }
 
-    private Optional<TypeDeclaration<?>> findTopLevelType(CompilationUnit unit) {
-        return unit.getPrimaryType()
-            .or(() -> unit.getTypes().isEmpty()
-                ? Optional.empty()
-                : Optional.of(unit.getType(0)));
+    private Optional<TypeDeclaration<?>> findType(CompilationUnit unit, String typeName) {
+        return unit.findAll(TypeDeclaration.class).stream()
+            .filter(type -> type.getNameAsString().equals(typeName))
+            .findFirst()
+            .map(type -> (TypeDeclaration<?>) type);
     }
 
     private static List<String> extractValues(AnnotationExpr annotation) {

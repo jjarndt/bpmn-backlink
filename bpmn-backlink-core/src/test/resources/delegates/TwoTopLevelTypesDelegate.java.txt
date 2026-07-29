@@ -4,9 +4,8 @@ import org.camunda.bpm.engine.delegate.DelegateExecution;
 import org.camunda.bpm.engine.delegate.JavaDelegate;
 
 /**
- * The public primary type implements JavaDelegate and must be the one that
- * gets annotated. A second, package-private top-level type must stay
- * untouched.
+ * The public primary type implements JavaDelegate; a second, package-private
+ * top-level type sits next to it. Each of them must be addressable on its own.
  */
 public class TwoTopLevelTypesDelegate implements JavaDelegate {
 

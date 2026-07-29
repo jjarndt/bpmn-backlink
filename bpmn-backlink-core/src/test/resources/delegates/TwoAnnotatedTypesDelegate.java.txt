@@ -1,0 +1,27 @@
+package net.example.delegate;
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Two top-level types that both carry the annotation. Removing it from one of
+ * them must keep the import alive for the other.
+ */
+@CalledFrom("bpmn/processes/gone.bpmn")
+public class TwoAnnotatedTypesDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("first", true);
+    }
+}
+
+@CalledFrom("bpmn/processes/kept.bpmn")
+class CompanionDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("second", true);
+    }
+}

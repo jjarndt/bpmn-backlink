@@ -5,8 +5,8 @@ import org.camunda.bpm.engine.delegate.JavaDelegate;
 
 /**
  * The outer type does not implement JavaDelegate; only a nested static class
- * does. The annotation is written to the top-level type regardless, which is
- * the documented behaviour (the indexer addresses the file's primary type).
+ * does. The annotation must be written to the nested type, not to the
+ * enclosing one.
  */
 public class InnerClassDelegate {
 

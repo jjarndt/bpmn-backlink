@@ -39,7 +39,7 @@ import java.util.SortedSet;
  * <ul>
  *   <li>{@link Mode#UPDATE} rewrites the affected source files and counts the
  *       additions/changes ({@code updated}), removals ({@code removed}) and
- *       files already correct ({@code unchanged});</li>
+ *       delegates already correct ({@code unchanged});</li>
  *   <li>{@link Mode#CHECK} never writes a file; every mismatch is reported in
  *       {@link BacklinkResult#drift()} while the counters describe what an
  *       {@code UPDATE} run would have done.</li>
@@ -91,7 +91,7 @@ public final class BacklinkProcessor {
 
         for (DelegateType delegate : delegates) {
             List<String> expected = expectedFor(delegate, index);
-            List<String> current = writer.readCurrentValues(delegate.sourceFile());
+            List<String> current = writer.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
 
             if (expected.equals(current)) {
                 unchanged++;
@@ -102,7 +102,7 @@ public final class BacklinkProcessor {
             if (config.mode() == Mode.CHECK) {
                 drift.add(new BacklinkResult.Drift(delegate.sourceFile(), expected, current));
             } else {
-                writer.write(delegate.sourceFile(), expected);
+                writer.write(delegate.sourceFile(), delegate.simpleName(), expected);
             }
 
             if (removal) {
