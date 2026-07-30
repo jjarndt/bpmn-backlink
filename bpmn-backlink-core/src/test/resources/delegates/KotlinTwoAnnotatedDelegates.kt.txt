@@ -1,0 +1,10 @@
+package net.example.delegate
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+@CalledFrom("bpmn/processes/order.bpmn")
+class KotlinFirstDelegate : JavaDelegate
+
+@CalledFrom("bpmn/processes/sub/shipping.bpmn")
+class KotlinSecondDelegate : JavaDelegate

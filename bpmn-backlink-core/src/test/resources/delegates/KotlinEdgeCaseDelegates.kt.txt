@@ -1,0 +1,55 @@
+package net.example.delegate
+
+import org.camunda.bpm.engine.delegate.DelegateExecution
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+/*
+ * A nested /* block comment */ that talks about
+ * class CommentedOutDelegate : JavaDelegate
+ * and must be ignored completely.
+ */
+
+/** A type parameter bound is not a supertype. */
+class ConstrainedRegistry<T : JavaDelegate>(private val types: List<T>)
+
+abstract class AbstractKotlinDelegate : JavaDelegate
+
+sealed class SealedKotlinDelegate : JavaDelegate
+
+interface KotlinDelegateFacade : JavaDelegate
+
+class WhereBoundRegistry<T> : Runnable where T : JavaDelegate {
+    override fun run() = Unit
+}
+
+class MultilineConstructorDelegate(
+    private val label: String = "class QuotedDelegate : JavaDelegate",
+    private val onDone: (String) -> Unit = { value -> println(value) },
+) : JavaDelegate {
+
+    override fun execute(execution: DelegateExecution) = onDone(label)
+}
+
+object KotlinObjectDelegate : JavaDelegate {
+
+    override fun execute(execution: DelegateExecution) = Unit
+}
+
+class DelegatingKotlinDelegate(private val target: JavaDelegate) : JavaDelegate by target
+
+val anonymous = object : JavaDelegate {
+
+    override fun execute(execution: DelegateExecution) = Unit
+}
+
+val documentation = """
+    class RawStringDelegate : JavaDelegate
+    ${ "class TemplateDelegate : JavaDelegate" }
+"""
+
+val reference = KotlinObjectDelegate::class
+
+class `spaced out delegate` : JavaDelegate {
+
+    override fun execute(execution: DelegateExecution) = Unit
+}

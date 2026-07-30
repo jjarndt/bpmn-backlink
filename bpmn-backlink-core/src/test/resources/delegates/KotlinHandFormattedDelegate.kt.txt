@@ -1,0 +1,15 @@
+package net.example.delegate
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+/**
+ * Hand-written annotation spread over several lines. A rewrite to the same
+ * value set must normalize it, and removing it must take all of its lines.
+ */
+@CalledFrom(
+    value = [
+        "bpmn/processes/order.bpmn",
+    ],
+)
+class KotlinHandFormattedDelegate : JavaDelegate

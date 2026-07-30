@@ -1,0 +1,3 @@
+package net.example.delegate
+
+val marker = 1; class KotlinSameLineDelegate : JavaDelegate

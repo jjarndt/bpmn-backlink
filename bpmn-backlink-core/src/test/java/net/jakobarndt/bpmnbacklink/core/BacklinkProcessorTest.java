@@ -29,7 +29,9 @@ import java.util.List;
 
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.bpmnProcessesDir;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyBpmn;
+import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyBpmnProcess;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyDelegates;
+import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyKotlinDelegates;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.delegateFile;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.read;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.sourceRoot;
@@ -270,5 +272,78 @@ class BacklinkProcessorTest {
 
         assertTrue(check.drift().isEmpty(), "after UPDATE a CHECK must be clean");
         assertEquals(3, check.unchanged());
+    }
+
+    @Test
+    void updateAnnotatesJavaAndKotlinDelegatesOfOneTree(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyBpmnProcess(root, "kotlin.bpmn");
+        copyDelegates(root, "OrderDelegate", "OrderDelegate.java");
+        copyKotlinDelegates(root,
+            "KotlinOrderDelegate", "KotlinOrderDelegate.kt",
+            "KotlinShippingDelegate", "KotlinShippingDelegate.kt");
+
+        BacklinkResult result = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+
+        assertEquals(3, result.updated(), "both languages must be written in the same run");
+        String java = read(delegateFile(root, "OrderDelegate.java"));
+        assertTrue(java.contains("@CalledFrom({"), "the Java delegate keeps the Java array form:\n" + java);
+
+        String kotlin = read(delegateFile(root, "KotlinOrderDelegate.kt"));
+        assertTrue(kotlin.contains("@CalledFrom(\"bpmn/processes/kotlin.bpmn\")"),
+            "the Kotlin delegate gets the Kotlin vararg form:\n" + kotlin);
+        assertTrue(kotlin.contains("import net.jakobarndt.bpmnbacklink.annotation.CalledFrom\n"),
+            "a Kotlin import carries no semicolon:\n" + kotlin);
+
+        String shipping = read(delegateFile(root, "KotlinShippingDelegate.kt"));
+        assertTrue(shipping.contains("@CalledFrom(\"bpmn/processes/kotlin.bpmn\")\nopen class KotlinShippingDelegate"),
+            "a camunda:class reference resolves to the Kotlin type too:\n" + shipping);
+    }
+
+    @Test
+    void secondRunOverAMixedTreeIsIdempotentAndDriftFree(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyBpmnProcess(root, "kotlin.bpmn");
+        copyDelegates(root, "OrderDelegate", "OrderDelegate.java");
+        copyKotlinDelegates(root, "KotlinOrderDelegate", "KotlinOrderDelegate.kt");
+
+        new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+        String afterFirst = read(delegateFile(root, "KotlinOrderDelegate.kt"));
+        BacklinkResult second = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+        BacklinkResult check = new BacklinkProcessor(config(root, resources, Mode.CHECK)).run();
+
+        assertEquals(0, second.updated());
+        assertEquals(2, second.unchanged());
+        assertEquals(afterFirst, read(delegateFile(root, "KotlinOrderDelegate.kt")),
+            "a second run must not change the Kotlin file byte for byte");
+        assertTrue(check.drift().isEmpty(), "the vararg form must not be reported as drift");
+    }
+
+    @Test
+    void checkReportsDriftOfAKotlinDelegateWithoutWriting(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyBpmnProcess(root, "kotlin.bpmn");
+        copyKotlinDelegates(root, "KotlinOrderDelegate", "KotlinOrderDelegate.kt");
+        String before = read(delegateFile(root, "KotlinOrderDelegate.kt"));
+
+        BacklinkResult result = new BacklinkProcessor(config(root, resources, Mode.CHECK)).run();
+
+        assertEquals(1, result.drift().size());
+        assertEquals(List.of("bpmn/processes/kotlin.bpmn"), result.drift().get(0).expected());
+        assertEquals(List.of(), result.drift().get(0).actual());
+        assertEquals(before, read(delegateFile(root, "KotlinOrderDelegate.kt")),
+            "CHECK must never write a Kotlin file");
+    }
+
+    @Test
+    void updateRemovesAnObsoleteKotlinAnnotation(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyKotlinDelegates(root, "KotlinPreAnnotatedOrderDelegate", "KotlinOrderDelegate.kt");
+
+        BacklinkResult result = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+
+        assertEquals(1, result.removed(), "no BPMN references the Kotlin delegate any more");
+        String content = read(delegateFile(root, "KotlinOrderDelegate.kt"));
+        assertFalse(content.contains("CalledFrom"), "annotation and import must be gone:\n" + content);
     }
 }

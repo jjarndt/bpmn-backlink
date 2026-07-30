@@ -1,2 +1,3 @@
-# Keep test fixture bytes verbatim; CrlfDelegate verifies CRLF preservation.
+# Keep test fixture bytes verbatim; the CrlfDelegate fixtures verify CRLF preservation.
 bpmn-backlink-core/src/test/resources/delegates/*.java.txt -text
+bpmn-backlink-core/src/test/resources/delegates/*.kt.txt -text

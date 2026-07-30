@@ -18,7 +18,8 @@ package net.jakobarndt.bpmnbacklink.core;
 import net.jakobarndt.bpmnbacklink.core.bpmn.BpmnDelegateIndexer;
 import net.jakobarndt.bpmnbacklink.core.scan.DelegateScanner;
 import net.jakobarndt.bpmnbacklink.core.scan.DelegateType;
-import net.jakobarndt.bpmnbacklink.core.write.AnnotationWriter;
+import net.jakobarndt.bpmnbacklink.core.write.AnnotationEditor;
+import net.jakobarndt.bpmnbacklink.core.write.AnnotationEditors;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -53,7 +54,6 @@ public final class BacklinkProcessor {
     private final BacklinkConfig config;
     private final BpmnDelegateIndexer indexer;
     private final DelegateScanner scanner;
-    private final AnnotationWriter writer;
 
     /**
      * @param config the run configuration; must not be {@code null}
@@ -62,14 +62,14 @@ public final class BacklinkProcessor {
         this.config = Objects.requireNonNull(config, "config");
         this.indexer = new BpmnDelegateIndexer(config.bpmnDirectory(), config.bpmnReferenceRoot());
         this.scanner = new DelegateScanner(config.sourceDirectory());
-        this.writer = new AnnotationWriter();
     }
 
     /**
      * Executes the run.
      *
      * @return the aggregated result
-     * @throws UncheckedIOException if a BPMN or Java file cannot be read or written
+     * @throws UncheckedIOException if a BPMN or delegate source file cannot be
+     *     read or written
      */
     public BacklinkResult run() {
         try {
@@ -89,8 +89,9 @@ public final class BacklinkProcessor {
         List<BacklinkResult.Drift> drift = new ArrayList<>();
 
         for (DelegateType delegate : delegates) {
+            AnnotationEditor editor = AnnotationEditors.forFile(delegate.sourceFile());
             List<String> expected = expectedFor(delegate, index);
-            List<String> current = writer.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
+            List<String> current = editor.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
 
             if (expected.equals(current)) {
                 unchanged++;
@@ -101,7 +102,7 @@ public final class BacklinkProcessor {
             if (config.mode() == Mode.CHECK) {
                 drift.add(new BacklinkResult.Drift(delegate.sourceFile(), expected, current));
             } else {
-                writer.write(delegate.sourceFile(), delegate.simpleName(), expected);
+                editor.write(delegate.sourceFile(), delegate.simpleName(), expected);
             }
 
             if (removal) {
