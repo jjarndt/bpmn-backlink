@@ -18,6 +18,7 @@ package net.jakobarndt.bpmnbacklink.core.kotlin;
 import net.jakobarndt.bpmnbacklink.core.util.Names;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -42,20 +43,34 @@ public final class KotlinDeclarations {
 
     private static final Set<String> DECLARATION_KEYWORDS = Set.of("class", "object");
 
+    /** Modifiers that a declaration and its primary constructor have in common. */
+    private static final Set<String> VISIBILITY_MODIFIERS =
+        Set.of("public", "private", "protected", "internal");
+
     /** Modifiers that may precede a class or object declaration. */
-    private static final Set<String> MODIFIERS = Set.of(
-        "public", "private", "protected", "internal",
+    private static final Set<String> MODIFIERS = union(VISIBILITY_MODIFIERS,
         "open", "final", "abstract", "sealed",
         "data", "inner", "enum", "annotation", "value", "inline",
         "external", "expect", "actual", "companion");
 
     /** Tokens that may sit between the declaration name and the primary constructor. */
-    private static final Set<String> CONSTRUCTOR_PREFIXES = Set.of(
-        "constructor", "public", "private", "protected", "internal");
+    private static final Set<String> CONSTRUCTOR_PREFIXES = union(VISIBILITY_MODIFIERS, "constructor");
 
     private static final String WHERE_KEYWORD = "where";
 
+    /** Delimiter of a name that is not a plain identifier, such as {@code `my name`}. */
+    private static final char BACKTICK = '`';
+
+    /** Offset answer of the helpers that may find nothing. */
+    private static final int NOT_FOUND = -1;
+
     private KotlinDeclarations() {
+    }
+
+    private static Set<String> union(Set<String> base, String... more) {
+        Set<String> all = new HashSet<>(base);
+        all.addAll(Set.of(more));
+        return Set.copyOf(all);
     }
 
     /**
@@ -106,19 +121,26 @@ public final class KotlinDeclarations {
 
     private static int endOfDeclarationName(String text, int start) {
         if (start >= text.length()) {
-            return -1;
+            return NOT_FOUND;
         }
-        if (text.charAt(start) == '`') {
-            int close = text.indexOf('`', start + 1);
-            return close < 0 ? -1 : close + 1;
+        if (text.charAt(start) == BACKTICK) {
+            int close = text.indexOf(BACKTICK, start + 1);
+            if (close < 0) {
+                return NOT_FOUND;
+            }
+            return close + 1;
         }
-        return isNameStart(text.charAt(start)) ? endOfWord(text, start) : -1;
+        if (!isNameStart(text.charAt(start))) {
+            return NOT_FOUND;
+        }
+        return endOfWord(text, start);
     }
 
     private static String declarationName(String original, int start, int end) {
-        return original.charAt(start) == '`'
-            ? original.substring(start + 1, end - 1)
-            : original.substring(start, end);
+        if (original.charAt(start) == BACKTICK) {
+            return original.substring(start + 1, end - 1);
+        }
+        return original.substring(start, end);
     }
 
     // -----------------------------------------------------------------
@@ -133,65 +155,141 @@ public final class KotlinDeclarations {
                 return index;
             }
             char current = text.charAt(index);
-            if (current == '<') {
-                index = skipAngles(text, index);
-            } else if (current == '@') {
-                index = skipAnnotation(text, index);
-            } else if (current == '(') {
+            if (current == '(') {
                 return skipParentheses(text, index);
-            } else if (isNameStart(current) && CONSTRUCTOR_PREFIXES.contains(word(text, index))) {
-                index = endOfWord(text, index);
-            } else {
+            }
+            int next = afterConstructorToken(text, index, current);
+            if (next == index) {
                 return index;
             }
+            index = next;
         }
     }
 
-    private static List<String> readSupertypeNames(String text, int start) {
-        List<String> names = new ArrayList<>();
-        int index = skipWhitespace(text, start);
-        if (index >= text.length() || text.charAt(index) != ':') {
-            return names;
+    private static int afterConstructorToken(String text, int index, char current) {
+        if (current == '<') {
+            return skipAngles(text, index);
         }
-        int listStart = index + 1;
-        index = listStart;
+        if (current == '@') {
+            return skipAnnotation(text, index);
+        }
+        if (isNameStart(current) && CONSTRUCTOR_PREFIXES.contains(word(text, index))) {
+            return endOfWord(text, index);
+        }
+        return index;
+    }
+
+    private static List<String> readSupertypeNames(String text, int start) {
+        int colon = skipWhitespace(text, start);
+        if (colon >= text.length() || text.charAt(colon) != ':') {
+            return new ArrayList<>();
+        }
+        int listStart = colon + 1;
+        return headNames(text, listStart, endOfSupertypeList(text, listStart));
+    }
+
+    /**
+     * Finds where the supertype list stops: at the class body, at a
+     * {@code where} clause, or at the line break that ends the declaration
+     * without a body.
+     */
+    private static int endOfSupertypeList(String text, int listStart) {
+        int index = listStart;
         int depth = 0;
-        boolean expectName = true;
         while (index < text.length()) {
             char current = text.charAt(index);
-            if (isArrow(text, index)) {
-                index += 2;
-            } else if (isOpeningBracket(current)) {
-                depth++;
+            int nested = afterBracket(text, index, current);
+            if (nested != index) {
+                depth += bracketDelta(current);
+                index = nested;
+                continue;
+            }
+            if (depth > 0) {
                 index++;
-            } else if (isClosingBracket(current)) {
-                depth--;
+                continue;
+            }
+            if (current == '{' || endsDeclarationLine(text, listStart, index, current)) {
+                return index;
+            }
+            if (!isNameStart(current)) {
                 index++;
-            } else if (depth > 0) {
+                continue;
+            }
+            int end = endOfQualifiedName(text, index);
+            if (text.substring(index, end).equals(WHERE_KEYWORD)) {
+                return index;
+            }
+            index = end;
+        }
+        return index;
+    }
+
+    /**
+     * Reads the leading qualified name of every comma-separated entry of the
+     * supertype list, so a generic argument or a delegation target is skipped.
+     */
+    private static List<String> headNames(String text, int listStart, int listEnd) {
+        List<String> names = new ArrayList<>();
+        int index = listStart;
+        int depth = 0;
+        boolean expectName = true;
+        while (index < listEnd) {
+            char current = text.charAt(index);
+            int nested = afterBracket(text, index, current);
+            if (nested != index) {
+                depth += bracketDelta(current);
+                index = nested;
+                continue;
+            }
+            if (depth > 0) {
                 index++;
-            } else if (current == '{') {
-                return names;
-            } else if (current == ',') {
+                continue;
+            }
+            if (current == ',') {
                 expectName = true;
                 index++;
-            } else if (current == '\n' && !continuesAfterLineBreak(text, listStart, index)) {
-                return names;
-            } else if (!isNameStart(current)) {
-                index++;
-            } else {
-                int end = endOfQualifiedName(text, index);
-                String qualified = text.substring(index, end);
-                if (qualified.equals(WHERE_KEYWORD)) {
-                    return names;
-                }
-                if (expectName) {
-                    names.add(Names.simpleName(qualified));
-                    expectName = false;
-                }
-                index = end;
+                continue;
             }
+            if (!isNameStart(current)) {
+                index++;
+                continue;
+            }
+            int end = endOfQualifiedName(text, index);
+            if (expectName) {
+                names.add(Names.simpleName(text.substring(index, end)));
+                expectName = false;
+            }
+            index = end;
         }
         return names;
+    }
+
+    /**
+     * @return the offset after an arrow or a bracket at {@code index}, or
+     *     {@code index} itself if neither is there
+     */
+    private static int afterBracket(String text, int index, char current) {
+        if (isArrow(text, index)) {
+            return index + 2;
+        }
+        if (isOpeningBracket(current) || isClosingBracket(current)) {
+            return index + 1;
+        }
+        return index;
+    }
+
+    private static int bracketDelta(char current) {
+        if (isOpeningBracket(current)) {
+            return 1;
+        }
+        if (isClosingBracket(current)) {
+            return -1;
+        }
+        return 0;
+    }
+
+    private static boolean endsDeclarationLine(String text, int listStart, int index, char current) {
+        return current == '\n' && !continuesAfterLineBreak(text, listStart, index);
     }
 
     private static boolean continuesAfterLineBreak(String text, int listStart, int lineBreak) {
@@ -210,46 +308,91 @@ public final class KotlinDeclarations {
     private record Header(int start, List<String> modifiers, List<KotlinDeclaration.AnnotationRef> annotations) {
     }
 
+    /**
+     * A named token found by the backward walk, with the offsets of its
+     * optional argument list.
+     *
+     * @param nameStart the offset of the first character of the (qualified) name
+     * @param nameEnd the offset after the name
+     * @param argumentsStart the offset of the opening parenthesis, or
+     *     {@link #NOT_FOUND} if the token carries no argument list
+     * @param tokenEnd the offset after the whole token, arguments included
+     */
+    private record NameToken(int nameStart, int nameEnd, int argumentsStart, int tokenEnd) {
+
+        private static final NameToken NONE = new NameToken(NOT_FOUND, NOT_FOUND, NOT_FOUND, NOT_FOUND);
+
+        private boolean isAbsent() {
+            return nameStart == NOT_FOUND;
+        }
+
+        private boolean hasArguments() {
+            return argumentsStart != NOT_FOUND;
+        }
+    }
+
     private static Header readHeader(String text, int keywordStart) {
         List<String> modifiers = new ArrayList<>();
         List<KotlinDeclaration.AnnotationRef> annotations = new ArrayList<>();
         int start = keywordStart;
         while (true) {
-            int last = lastNonWhitespace(text, 0, start);
-            if (last < 0) {
+            NameToken token = tokenBefore(text, start);
+            if (token.isAbsent()) {
                 return new Header(start, modifiers, annotations);
             }
-            int argumentsStart = -1;
-            int nameEnd;
-            if (text.charAt(last) == ')') {
-                argumentsStart = matchingParenthesis(text, last);
-                if (argumentsStart < 0) {
-                    return new Header(start, modifiers, annotations);
-                }
-                nameEnd = lastNonWhitespace(text, 0, argumentsStart) + 1;
-            } else if (isNamePart(text.charAt(last))) {
-                nameEnd = last + 1;
-            } else {
-                return new Header(start, modifiers, annotations);
+            String name = text.substring(token.nameStart(), token.nameEnd());
+            if (token.nameStart() > 0 && text.charAt(token.nameStart() - 1) == '@') {
+                annotations.add(annotationRef(name, token));
+                start = token.nameStart() - 1;
+                continue;
             }
-            int nameStart = startOfQualifiedName(text, nameEnd);
-            if (nameStart == nameEnd) {
-                return new Header(start, modifiers, annotations);
-            }
-            String name = text.substring(nameStart, nameEnd);
-            if (nameStart > 0 && text.charAt(nameStart - 1) == '@') {
-                int end = argumentsStart < 0 ? nameEnd : last + 1;
-                annotations.add(new KotlinDeclaration.AnnotationRef(
-                    Names.simpleName(name), nameStart - 1, end,
-                    argumentsStart < 0 ? end : argumentsStart, end));
-                start = nameStart - 1;
-            } else if (argumentsStart < 0 && MODIFIERS.contains(name)) {
+            if (!token.hasArguments() && MODIFIERS.contains(name)) {
                 modifiers.add(name);
-                start = nameStart;
-            } else {
-                return new Header(start, modifiers, annotations);
+                start = token.nameStart();
+                continue;
             }
+            return new Header(start, modifiers, annotations);
         }
+    }
+
+    private static KotlinDeclaration.AnnotationRef annotationRef(String name, NameToken token) {
+        int end = token.tokenEnd();
+        int argumentsStart = end;
+        if (token.hasArguments()) {
+            argumentsStart = token.argumentsStart();
+        }
+        return new KotlinDeclaration.AnnotationRef(
+            Names.simpleName(name), token.nameStart() - 1, end, argumentsStart, end);
+    }
+
+    private static NameToken tokenBefore(String text, int position) {
+        int last = lastNonWhitespace(text, 0, position);
+        if (last < 0) {
+            return NameToken.NONE;
+        }
+        if (text.charAt(last) == ')') {
+            return parenthesizedTokenBefore(text, last);
+        }
+        if (!isNamePart(text.charAt(last))) {
+            return NameToken.NONE;
+        }
+        return nameTokenEndingAt(text, last + 1, NOT_FOUND, last + 1);
+    }
+
+    private static NameToken parenthesizedTokenBefore(String text, int close) {
+        int open = matchingParenthesis(text, close);
+        if (open < 0) {
+            return NameToken.NONE;
+        }
+        return nameTokenEndingAt(text, lastNonWhitespace(text, 0, open) + 1, open, close + 1);
+    }
+
+    private static NameToken nameTokenEndingAt(String text, int nameEnd, int argumentsStart, int tokenEnd) {
+        int nameStart = startOfQualifiedName(text, nameEnd);
+        if (nameStart == nameEnd) {
+            return NameToken.NONE;
+        }
+        return new NameToken(nameStart, nameEnd, argumentsStart, tokenEnd);
     }
 
     // -----------------------------------------------------------------
@@ -263,20 +406,25 @@ public final class KotlinDeclarations {
             char current = text.charAt(index);
             if (isArrow(text, index)) {
                 index += 2;
-            } else if (current == '<') {
-                depth++;
-                index++;
-            } else if (current == '>') {
-                depth--;
-                index++;
-                if (depth == 0) {
-                    return index;
-                }
-            } else {
-                index++;
+                continue;
+            }
+            depth += angleDelta(current);
+            index++;
+            if (current == '>' && depth == 0) {
+                return index;
             }
         }
         return index;
+    }
+
+    private static int angleDelta(char current) {
+        if (current == '<') {
+            return 1;
+        }
+        if (current == '>') {
+            return -1;
+        }
+        return 0;
     }
 
     private static int skipParentheses(String text, int start) {
@@ -299,7 +447,10 @@ public final class KotlinDeclarations {
 
     private static int skipAnnotation(String text, int start) {
         int index = endOfQualifiedName(text, start + 1);
-        return index < text.length() && text.charAt(index) == '(' ? skipParentheses(text, index) : index;
+        if (index < text.length() && text.charAt(index) == '(') {
+            return skipParentheses(text, index);
+        }
+        return index;
     }
 
     private static int matchingParenthesis(String text, int close) {
@@ -317,7 +468,7 @@ public final class KotlinDeclarations {
             }
             index--;
         }
-        return -1;
+        return NOT_FOUND;
     }
 
     private static int skipWhitespace(String text, int start) {
@@ -333,7 +484,10 @@ public final class KotlinDeclarations {
         while (index >= from && Character.isWhitespace(text.charAt(index))) {
             index--;
         }
-        return index < from ? -1 : index;
+        if (index < from) {
+            return NOT_FOUND;
+        }
+        return index;
     }
 
     private static String word(String text, int start) {
@@ -385,6 +539,9 @@ public final class KotlinDeclarations {
     }
 
     private static char charAt(String text, int index) {
-        return index < text.length() ? text.charAt(index) : '\0';
+        if (index < text.length()) {
+            return text.charAt(index);
+        }
+        return '\0';
     }
 }

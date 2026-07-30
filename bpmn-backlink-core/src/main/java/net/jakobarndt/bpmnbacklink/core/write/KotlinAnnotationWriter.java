@@ -62,10 +62,20 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
 
     private static final String STAR_IMPORT = "net.jakobarndt.bpmnbacklink.annotation.*";
 
+    private static final String LINE_FEED = "\n";
+
+    private static final String CARRIAGE_RETURN_LINE_FEED = "\r\n";
+
     /** Blanks left behind on a line after an annotation has been cut out of it. */
     private static final Pattern LEADING_BLANKS = Pattern.compile("^[ \\t]+");
 
-    /** Matches any remaining use of the annotation, with or without a qualifier. */
+    /** Kotlin escape sequence for the backspace character. */
+    private static final String BACKSPACE_ESCAPE = "\\b";
+
+    /**
+     * Matches any remaining use of the annotation, with or without a qualifier.
+     * The trailing word boundary keeps a longer name from matching.
+     */
     private static final Pattern REMAINING_USE =
         Pattern.compile("@(?:[\\p{L}_][\\p{L}\\p{N}_]*\\.)*" + ANNOTATION_SIMPLE_NAME + "\\b");
 
@@ -90,7 +100,7 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
         KotlinDeclaration type = declaration(source, typeName)
             .orElseThrow(() -> new IllegalStateException("No type " + typeName + " in " + sourceFile));
 
-        String separator = original.contains("\r\n") ? "\r\n" : "\n";
+        String separator = lineSeparatorOf(original);
         Optional<KotlinDeclaration.AnnotationRef> current = type.annotation(ANNOTATION_SIMPLE_NAME);
 
         String updated;
@@ -107,6 +117,13 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
                 separator);
         }
         Files.writeString(sourceFile, updated, StandardCharsets.UTF_8);
+    }
+
+    private static String lineSeparatorOf(String text) {
+        if (text.contains(CARRIAGE_RETURN_LINE_FEED)) {
+            return CARRIAGE_RETURN_LINE_FEED;
+        }
+        return LINE_FEED;
     }
 
     private static String read(Path sourceFile) throws IOException {
@@ -138,7 +155,7 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
                 case '"' -> rendered.append("\\\"");
                 case '$' -> rendered.append("\\$");
                 case '\t' -> rendered.append("\\t");
-                case '\b' -> rendered.append("\\b");
+                case '\b' -> rendered.append(BACKSPACE_ESCAPE);
                 case '\n' -> rendered.append("\\n");
                 case '\r' -> rendered.append("\\r");
                 default -> rendered.append(current);
@@ -158,8 +175,7 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
 
     private static String removeAnnotation(String text, KotlinDeclaration.AnnotationRef annotation) {
         int lineStart = startOfLine(text, annotation.start());
-        int newline = text.indexOf('\n', annotation.end());
-        int lineEnd = newline < 0 ? text.length() : newline + 1;
+        int lineEnd = endOfLine(text, annotation.end());
         if (isBlank(text, lineStart, annotation.start()) && isBlank(text, annotation.end(), lineEnd)) {
             return text.substring(0, lineStart) + text.substring(lineEnd);
         }
@@ -243,8 +259,7 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
         List<SourceLine> lines = new ArrayList<>();
         int index = 0;
         while (index < sanitized.length()) {
-            int newline = sanitized.indexOf('\n', index);
-            int end = newline < 0 ? sanitized.length() : newline + 1;
+            int end = endOfLine(sanitized, index);
             lines.add(new SourceLine(index, end, sanitized.substring(index, end).trim()));
             index = end;
         }
@@ -257,6 +272,14 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
 
     private static String insertAt(String text, int at, String inserted) {
         return text.substring(0, at) + inserted + text.substring(at);
+    }
+
+    private static int endOfLine(String text, int position) {
+        int newline = text.indexOf('\n', position);
+        if (newline < 0) {
+            return text.length();
+        }
+        return newline + 1;
     }
 
     private static int startOfLine(String text, int position) {

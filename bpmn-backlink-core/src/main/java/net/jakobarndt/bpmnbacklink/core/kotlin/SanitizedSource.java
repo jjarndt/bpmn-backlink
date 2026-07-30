@@ -35,6 +35,15 @@ import java.util.List;
  */
 public record SanitizedSource(String original, String text, List<StringLiteral> literals) {
 
+    /** Length of the {@code """} delimiter of a raw string. */
+    private static final int RAW_DELIMITER_LENGTH = 3;
+
+    /** Length of the {@code "} delimiter of a simple string. */
+    private static final int SIMPLE_DELIMITER_LENGTH = 1;
+
+    /** Length of a {@code \\uXXXX} escape sequence. */
+    private static final int UNICODE_ESCAPE_LENGTH = 6;
+
     /**
      * A string literal token of the original source.
      *
@@ -63,33 +72,44 @@ public record SanitizedSource(String original, String text, List<StringLiteral> 
     }
 
     private String valueOf(StringLiteral literal) {
-        int delimiter = literal.raw() ? 3 : 1;
+        int delimiter = RAW_DELIMITER_LENGTH;
+        if (!literal.raw()) {
+            delimiter = SIMPLE_DELIMITER_LENGTH;
+        }
         int contentStart = literal.start() + delimiter;
         int contentEnd = literal.end() - delimiter;
         if (contentEnd <= contentStart) {
             return "";
         }
         String content = original.substring(contentStart, contentEnd);
-        return literal.raw() ? content : unescape(content);
+        if (literal.raw()) {
+            return content;
+        }
+        return unescape(content);
     }
 
     private static String unescape(String content) {
         StringBuilder result = new StringBuilder(content.length());
         int index = 0;
         while (index < content.length()) {
-            char current = content.charAt(index);
-            if (current != '\\' || index + 1 >= content.length()) {
-                result.append(current);
-                index++;
-            } else if (content.charAt(index + 1) == 'u' && index + 5 < content.length()) {
-                result.append((char) Integer.parseInt(content.substring(index + 2, index + 6), 16));
-                index += 6;
-            } else {
-                result.append(unescape(content.charAt(index + 1)));
-                index += 2;
-            }
+            index = appendCharacterAt(content, index, result);
         }
         return result.toString();
+    }
+
+    private static int appendCharacterAt(String content, int index, StringBuilder result) {
+        char current = content.charAt(index);
+        if (current != '\\' || index + 1 >= content.length()) {
+            result.append(current);
+            return index + 1;
+        }
+        if (content.charAt(index + 1) == 'u' && index + UNICODE_ESCAPE_LENGTH <= content.length()) {
+            String digits = content.substring(index + 2, index + UNICODE_ESCAPE_LENGTH);
+            result.append((char) Integer.parseInt(digits, 16));
+            return index + UNICODE_ESCAPE_LENGTH;
+        }
+        result.append(unescape(content.charAt(index + 1)));
+        return index + 2;
     }
 
     private static char unescape(char escaped) {

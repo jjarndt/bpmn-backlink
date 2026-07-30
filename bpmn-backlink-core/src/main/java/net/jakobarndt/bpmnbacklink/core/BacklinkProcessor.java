@@ -81,38 +81,59 @@ public final class BacklinkProcessor {
 
     private BacklinkResult runChecked() throws IOException {
         Map<String, SortedSet<String>> index = indexer.index();
-        List<DelegateType> delegates = scanner.scan();
+        Tally tally = new Tally();
+        for (DelegateType delegate : scanner.scan()) {
+            reconcile(delegate, expectedFor(delegate, index), tally);
+        }
+        return tally.toResult();
+    }
 
-        int updated = 0;
-        int removed = 0;
-        int unchanged = 0;
-        List<BacklinkResult.Drift> drift = new ArrayList<>();
+    private void reconcile(DelegateType delegate, List<String> expected, Tally tally) throws IOException {
+        AnnotationEditor editor = AnnotationEditors.forFile(delegate.sourceFile());
+        List<String> current = editor.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
+        if (expected.equals(current)) {
+            tally.countUnchanged();
+            return;
+        }
+        if (config.mode() == Mode.CHECK) {
+            tally.countDrift(new BacklinkResult.Drift(delegate.sourceFile(), expected, current));
+        } else {
+            editor.write(delegate.sourceFile(), delegate.simpleName(), expected);
+        }
+        if (expected.isEmpty()) {
+            tally.countRemoved();
+        } else {
+            tally.countUpdated();
+        }
+    }
 
-        for (DelegateType delegate : delegates) {
-            AnnotationEditor editor = AnnotationEditors.forFile(delegate.sourceFile());
-            List<String> expected = expectedFor(delegate, index);
-            List<String> current = editor.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
+    /** What the run has seen so far, accumulated across the delegates. */
+    private static final class Tally {
 
-            if (expected.equals(current)) {
-                unchanged++;
-                continue;
-            }
+        private final List<BacklinkResult.Drift> drift = new ArrayList<>();
+        private int updated;
+        private int removed;
+        private int unchanged;
 
-            boolean removal = expected.isEmpty();
-            if (config.mode() == Mode.CHECK) {
-                drift.add(new BacklinkResult.Drift(delegate.sourceFile(), expected, current));
-            } else {
-                editor.write(delegate.sourceFile(), delegate.simpleName(), expected);
-            }
-
-            if (removal) {
-                removed++;
-            } else {
-                updated++;
-            }
+        private void countUnchanged() {
+            unchanged++;
         }
 
-        return new BacklinkResult(updated, removed, unchanged, drift);
+        private void countUpdated() {
+            updated++;
+        }
+
+        private void countRemoved() {
+            removed++;
+        }
+
+        private void countDrift(BacklinkResult.Drift found) {
+            drift.add(found);
+        }
+
+        private BacklinkResult toResult() {
+            return new BacklinkResult(updated, removed, unchanged, drift);
+        }
     }
 
     private List<String> expectedFor(DelegateType delegate, Map<String, SortedSet<String>> index) {

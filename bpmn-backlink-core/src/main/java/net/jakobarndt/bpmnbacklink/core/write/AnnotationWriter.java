@@ -106,23 +106,23 @@ public final class AnnotationWriter implements AnnotationEditor {
             .orElseThrow(() -> new IllegalStateException("No type " + typeName + " in " + javaFile));
 
         Optional<AnnotationExpr> current = type.getAnnotationByName(ANNOTATION_SIMPLE_NAME);
-
         if (expected.isEmpty()) {
             current.ifPresent(AnnotationExpr::remove);
             removeImportIfUnused(unit);
         } else {
-            AnnotationExpr annotation = buildAnnotation(expected);
-            if (current.isPresent()) {
-                // Replacing in place keeps the indentation of the annotated type.
-                current.get().replace(annotation);
-            } else {
-                type.addAnnotation(annotation);
-            }
-            ensureImport(unit);
+            applyAnnotation(unit, type, current, expected);
         }
 
         String rendered = LexicalPreservingPrinter.print(unit);
         Files.writeString(javaFile, rendered, StandardCharsets.UTF_8);
+    }
+
+    private void applyAnnotation(CompilationUnit unit, TypeDeclaration<?> type,
+        Optional<AnnotationExpr> current, List<String> expected) {
+        AnnotationExpr annotation = buildAnnotation(expected);
+        // Replacing in place keeps the indentation of the annotated type.
+        current.ifPresentOrElse(present -> present.replace(annotation), () -> type.addAnnotation(annotation));
+        ensureImport(unit);
     }
 
     private CompilationUnit parse(Path javaFile) throws IOException {

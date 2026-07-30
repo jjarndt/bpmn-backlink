@@ -38,6 +38,12 @@ import java.util.List;
  */
 public final class KotlinSanitizer {
 
+    /** The delimiter that opens and closes a raw string. */
+    private static final String RAW_DELIMITER = "\"\"\"";
+
+    /** Length of the {@code /*} and {@code *} + {@code /} block comment markers. */
+    private static final int COMMENT_MARKER_LENGTH = 2;
+
     private KotlinSanitizer() {
     }
 
@@ -50,31 +56,37 @@ public final class KotlinSanitizer {
         List<SanitizedSource.StringLiteral> literals = new ArrayList<>();
         int index = 0;
         while (index < source.length()) {
-            char current = source.charAt(index);
-            if (current == '/' && charAt(source, index + 1) == '/') {
-                int end = endOfLine(source, index);
-                blank(blanked, index, end);
-                index = end;
-            } else if (current == '/' && charAt(source, index + 1) == '*') {
-                int end = endOfBlockComment(source, index);
-                blank(blanked, index, end);
-                index = end;
-            } else if (current == '"') {
-                int end = endOfString(source, index);
-                literals.add(new SanitizedSource.StringLiteral(index, end, isRawString(source, index)));
-                blank(blanked, index, end);
-                index = end;
-            } else if (current == '\'') {
-                int end = endOfCharLiteral(source, index);
-                blank(blanked, index, end);
-                index = end;
-            } else if (current == '`') {
-                index = blankBacktickName(source, blanked, index);
-            } else {
-                index++;
-            }
+            index = blankTokenAt(source, blanked, literals, index);
         }
         return new SanitizedSource(source, new String(blanked), List.copyOf(literals));
+    }
+
+    private static int blankTokenAt(String source, char[] blanked,
+        List<SanitizedSource.StringLiteral> literals, int index) {
+        char current = source.charAt(index);
+        if (current == '/' && charAt(source, index + 1) == '/') {
+            return blankUpTo(blanked, index, endOfLine(source, index));
+        }
+        if (current == '/' && charAt(source, index + 1) == '*') {
+            return blankUpTo(blanked, index, endOfBlockComment(source, index));
+        }
+        if (current == '"') {
+            int end = endOfString(source, index);
+            literals.add(new SanitizedSource.StringLiteral(index, end, isRawString(source, index)));
+            return blankUpTo(blanked, index, end);
+        }
+        if (current == '\'') {
+            return blankUpTo(blanked, index, endOfCharLiteral(source, index));
+        }
+        if (current == '`') {
+            return blankBacktickName(source, blanked, index);
+        }
+        return index + 1;
+    }
+
+    private static int blankUpTo(char[] blanked, int from, int to) {
+        blank(blanked, from, to);
+        return to;
     }
 
     private static int blankBacktickName(String source, char[] blanked, int start) {
@@ -93,69 +105,95 @@ public final class KotlinSanitizer {
 
     private static int endOfLine(String source, int start) {
         int newline = source.indexOf('\n', start);
-        return newline < 0 ? source.length() : newline;
+        if (newline < 0) {
+            return source.length();
+        }
+        return newline;
     }
 
     private static int endOfBlockComment(String source, int start) {
-        int index = start + 2;
+        int index = start + COMMENT_MARKER_LENGTH;
         int depth = 1;
         while (index < source.length()) {
             if (source.startsWith("/*", index)) {
                 depth++;
-                index += 2;
-            } else if (source.startsWith("*/", index)) {
-                depth--;
-                index += 2;
-                if (depth == 0) {
-                    return index;
-                }
-            } else {
+                index += COMMENT_MARKER_LENGTH;
+                continue;
+            }
+            if (!source.startsWith("*/", index)) {
                 index++;
+                continue;
+            }
+            depth--;
+            index += COMMENT_MARKER_LENGTH;
+            if (depth == 0) {
+                return index;
             }
         }
         return source.length();
     }
 
     private static boolean isRawString(String source, int start) {
-        return source.startsWith("\"\"\"", start);
+        return source.startsWith(RAW_DELIMITER, start);
     }
 
     private static int endOfString(String source, int start) {
-        return isRawString(source, start) ? endOfRawString(source, start) : endOfSimpleString(source, start);
+        if (isRawString(source, start)) {
+            return endOfRawString(source, start);
+        }
+        return endOfSimpleString(source, start);
     }
 
     private static int endOfRawString(String source, int start) {
-        int index = start + 3;
+        int index = start + RAW_DELIMITER.length();
         while (index < source.length()) {
-            if (source.startsWith("\"\"\"", index)) {
-                int end = index;
-                while (end < source.length() && source.charAt(end) == '"') {
-                    end++;
-                }
-                return end;
+            if (source.startsWith(RAW_DELIMITER, index)) {
+                return endOfQuoteRun(source, index);
             }
-            index = isTemplateStart(source, index) ? endOfTemplate(source, index) : index + 1;
+            if (isTemplateStart(source, index)) {
+                index = endOfTemplate(source, index);
+                continue;
+            }
+            index++;
         }
         return source.length();
+    }
+
+    /**
+     * A raw string ends at the last quote of a run of three or more, so any
+     * extra quote belongs to its content.
+     */
+    private static int endOfQuoteRun(String source, int start) {
+        int end = start;
+        while (end < source.length() && source.charAt(end) == '"') {
+            end++;
+        }
+        return end;
     }
 
     private static int endOfSimpleString(String source, int start) {
         int index = start + 1;
         while (index < source.length()) {
             char current = source.charAt(index);
-            if (current == '\\') {
-                index += 2;
-            } else if (current == '"') {
+            if (current == '"') {
                 return index + 1;
-            } else if (current == '\n') {
-                return index;
-            } else if (isTemplateStart(source, index)) {
-                index = endOfTemplate(source, index);
-            } else {
-                index++;
             }
+            if (current == '\n') {
+                return index;
+            }
+            index = afterSimpleStringCharacter(source, index, current);
         }
         return source.length();
+    }
+
+    private static int afterSimpleStringCharacter(String source, int index, char current) {
+        if (current == '\\') {
+            return index + 2;
+        }
+        if (isTemplateStart(source, index)) {
+            return endOfTemplate(source, index);
+        }
+        return index + 1;
     }
 
     private static boolean isTemplateStart(String source, int index) {
@@ -170,42 +208,58 @@ public final class KotlinSanitizer {
             if (current == '{') {
                 depth++;
                 index++;
-            } else if (current == '}') {
+                continue;
+            }
+            if (current == '}') {
                 depth--;
                 index++;
                 if (depth == 0) {
                     return index;
                 }
-            } else if (current == '"') {
-                index = endOfString(source, index);
-            } else if (current == '\'') {
-                index = endOfCharLiteral(source, index);
-            } else {
-                index++;
+                continue;
             }
+            index = afterTemplateCharacter(source, index, current);
         }
         return source.length();
+    }
+
+    private static int afterTemplateCharacter(String source, int index, char current) {
+        if (current == '"') {
+            return endOfString(source, index);
+        }
+        if (current == '\'') {
+            return endOfCharLiteral(source, index);
+        }
+        return index + 1;
     }
 
     private static int endOfCharLiteral(String source, int start) {
         int index = start + 1;
         while (index < source.length()) {
             char current = source.charAt(index);
-            if (current == '\\') {
-                index += 2;
-            } else if (current == '\'') {
+            if (current == '\'') {
                 return index + 1;
-            } else if (current == '\n') {
-                return index;
-            } else {
-                index++;
             }
+            if (current == '\n') {
+                return index;
+            }
+            index = afterCharLiteralCharacter(index, current);
         }
         return source.length();
     }
 
+    private static int afterCharLiteralCharacter(int index, char current) {
+        if (current == '\\') {
+            return index + 2;
+        }
+        return index + 1;
+    }
+
     private static char charAt(String source, int index) {
-        return index < source.length() ? source.charAt(index) : '\0';
+        if (index < source.length()) {
+            return source.charAt(index);
+        }
+        return '\0';
     }
 
     private static void blank(char[] blanked, int from, int to) {
