@@ -19,6 +19,7 @@ import net.jakobarndt.bpmnbacklink.core.kotlin.KotlinDeclaration;
 import net.jakobarndt.bpmnbacklink.core.kotlin.KotlinDeclarations;
 import net.jakobarndt.bpmnbacklink.core.kotlin.KotlinSanitizer;
 import net.jakobarndt.bpmnbacklink.core.kotlin.SanitizedSource;
+import net.jakobarndt.bpmnbacklink.core.util.Names;
 
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
@@ -47,6 +48,12 @@ import java.util.stream.Collectors;
  * without a package qualifier, so a check run does not report drift on source
  * that was written by hand.
  *
+ * <p>The type is addressed by its simple name across the whole file, so a
+ * nested type and every top-level type are reachable. If several declarations
+ * of a file share the simple name, the first one in source order is used; any
+ * further declaration of that name is then left untouched and reported as
+ * already correct, matching the Java editor.
+ *
  * <p>The import is inserted at its alphabetical position among the existing
  * imports. If the file has no import at all, the statement goes below the
  * package declaration, or, if there is none either, directly above the
@@ -60,6 +67,9 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
 
     private static final String PACKAGE_KEYWORD = "package ";
 
+    /** Separates the imported path from the name an aliased import binds. */
+    private static final String ALIAS_KEYWORD = " as ";
+
     private static final String STAR_IMPORT = "net.jakobarndt.bpmnbacklink.annotation.*";
 
     private static final String LINE_FEED = "\n";
@@ -69,15 +79,21 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
     /** Blanks left behind on a line after an annotation has been cut out of it. */
     private static final Pattern LEADING_BLANKS = Pattern.compile("^[ \\t]+");
 
+    /** Blanks in front of an annotation that ended its line. */
+    private static final Pattern TRAILING_BLANKS = Pattern.compile("[ \\t]+$");
+
     /** Kotlin escape sequence for the backspace character. */
     private static final String BACKSPACE_ESCAPE = "\\b";
 
     /**
-     * Matches any remaining use of the annotation, with or without a qualifier.
-     * The trailing word boundary keeps a longer name from matching.
+     * Matches any remaining use of the annotation name outside the import
+     * block, be it an annotation or a plain type reference such as
+     * {@code CalledFrom::class}. The word boundaries keep a longer name from
+     * matching. Erring towards keeping the import costs an unused import at
+     * worst, while dropping a needed one breaks the file.
      */
     private static final Pattern REMAINING_USE =
-        Pattern.compile("@(?:[\\p{L}_][\\p{L}\\p{N}_]*\\.)*" + ANNOTATION_SIMPLE_NAME + "\\b");
+        Pattern.compile("\\b" + ANNOTATION_SIMPLE_NAME + "\\b");
 
     @Override
     public boolean supports(Path sourceFile) {
@@ -119,8 +135,13 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
         Files.writeString(sourceFile, updated, StandardCharsets.UTF_8);
     }
 
+    /**
+     * Takes the separator from the first line break of the file. Scanning for
+     * any {@code \r\n} instead would let a raw string that merely carries
+     * Windows line endings as data decide how the file itself is written.
+     */
     private static String lineSeparatorOf(String text) {
-        if (text.contains(CARRIAGE_RETURN_LINE_FEED)) {
+        if (text.startsWith(CARRIAGE_RETURN_LINE_FEED, text.indexOf('\n') - 1)) {
             return CARRIAGE_RETURN_LINE_FEED;
         }
         return LINE_FEED;
@@ -176,11 +197,18 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
     private static String removeAnnotation(String text, KotlinDeclaration.AnnotationRef annotation) {
         int lineStart = startOfLine(text, annotation.start());
         int lineEnd = endOfLine(text, annotation.end());
-        if (isBlank(text, lineStart, annotation.start()) && isBlank(text, annotation.end(), lineEnd)) {
+        boolean endsItsLine = isBlank(text, annotation.end(), lineEnd);
+        if (isBlank(text, lineStart, annotation.start()) && endsItsLine) {
             return text.substring(0, lineStart) + text.substring(lineEnd);
         }
-        String tail = text.substring(annotation.end());
-        return text.substring(0, annotation.start()) + LEADING_BLANKS.matcher(tail).replaceFirst("");
+        String head = text.substring(0, annotation.start());
+        String tail = LEADING_BLANKS.matcher(text.substring(annotation.end())).replaceFirst("");
+        if (endsItsLine) {
+            // The blank that separated the annotation goes with it, so no line
+            // is left with trailing whitespace.
+            head = TRAILING_BLANKS.matcher(head).replaceFirst("");
+        }
+        return head + tail;
     }
 
     // -----------------------------------------------------------------
@@ -194,7 +222,7 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
         }
         String statement = IMPORT_KEYWORD + ANNOTATION_FQN;
         for (SourceLine line : imports) {
-            if (importPath(line).compareTo(ANNOTATION_FQN) > 0) {
+            if (importedName(line).path().compareTo(ANNOTATION_FQN) > 0) {
                 return insertAt(text, line.start(), statement + separator);
             }
         }
@@ -209,24 +237,62 @@ public final class KotlinAnnotationWriter implements AnnotationEditor {
     }
 
     private static String removeImportIfUnused(String text) {
-        SanitizedSource source = KotlinSanitizer.sanitize(text);
-        if (REMAINING_USE.matcher(source.text()).find()) {
+        if (REMAINING_USE.matcher(codeOutsideImports(text)).find()) {
             return text;
         }
         return importLines(text).stream()
-            .filter(line -> importPath(line).equals(ANNOTATION_FQN))
+            .filter(line -> bindsTheAnnotation(importedName(line)))
             .findFirst()
             .map(line -> text.substring(0, line.start()) + text.substring(line.end()))
             .orElse(text);
     }
 
-    private static boolean coversAnnotation(SourceLine line) {
-        String path = importPath(line);
-        return path.equals(ANNOTATION_FQN) || path.equals(STAR_IMPORT);
+    /**
+     * The sanitized text with the import statements blanked out, so the import
+     * of the annotation is not mistaken for a use of it.
+     */
+    private static String codeOutsideImports(String text) {
+        StringBuilder code = new StringBuilder(KotlinSanitizer.sanitize(text).text());
+        for (SourceLine line : importLines(text)) {
+            for (int index = line.start(); index < line.end(); index++) {
+                code.setCharAt(index, ' ');
+            }
+        }
+        return code.toString();
     }
 
-    private static String importPath(SourceLine line) {
-        return line.content().substring(IMPORT_KEYWORD.length()).trim().split("\\s+", 2)[0];
+    /**
+     * An import statement, split into the path it names and the name it binds.
+     * An aliased import binds another name, so it neither makes the simple name
+     * available nor may it be removed when the simple name falls out of use.
+     *
+     * @param path the imported path, a trailing semicolon already stripped
+     * @param boundName the name the statement makes available
+     */
+    private record ImportedName(String path, String boundName) {
+    }
+
+    private static boolean coversAnnotation(SourceLine line) {
+        ImportedName imported = importedName(line);
+        return imported.path().equals(STAR_IMPORT) || bindsTheAnnotation(imported);
+    }
+
+    private static boolean bindsTheAnnotation(ImportedName imported) {
+        return imported.path().equals(ANNOTATION_FQN)
+            && imported.boundName().equals(ANNOTATION_SIMPLE_NAME);
+    }
+
+    private static ImportedName importedName(SourceLine line) {
+        String statement = line.content().substring(IMPORT_KEYWORD.length()).trim();
+        if (statement.endsWith(";")) {
+            statement = statement.substring(0, statement.length() - 1).trim();
+        }
+        int alias = statement.indexOf(ALIAS_KEYWORD);
+        if (alias >= 0) {
+            return new ImportedName(statement.substring(0, alias).trim(),
+                statement.substring(alias + ALIAS_KEYWORD.length()).trim());
+        }
+        return new ImportedName(statement, Names.simpleName(statement));
     }
 
     private static List<SourceLine> importLines(String text) {

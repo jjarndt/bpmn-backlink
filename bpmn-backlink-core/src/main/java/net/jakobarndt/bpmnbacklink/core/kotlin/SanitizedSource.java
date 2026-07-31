@@ -103,13 +103,30 @@ public record SanitizedSource(String original, String text, List<StringLiteral> 
             result.append(current);
             return index + 1;
         }
-        if (content.charAt(index + 1) == 'u' && index + UNICODE_ESCAPE_LENGTH <= content.length()) {
+        if (isUnicodeEscapeAt(content, index)) {
             String digits = content.substring(index + 2, index + UNICODE_ESCAPE_LENGTH);
             result.append((char) Integer.parseInt(digits, 16));
             return index + UNICODE_ESCAPE_LENGTH;
         }
         result.append(unescape(content.charAt(index + 1)));
         return index + 2;
+    }
+
+    /**
+     * A {@code \\u} sequence only decodes when it is complete and all four of
+     * its digits are hexadecimal; anything else stays plain text rather than
+     * failing the whole value.
+     */
+    private static boolean isUnicodeEscapeAt(String content, int index) {
+        if (content.charAt(index + 1) != 'u' || index + UNICODE_ESCAPE_LENGTH > content.length()) {
+            return false;
+        }
+        for (int digit = index + 2; digit < index + UNICODE_ESCAPE_LENGTH; digit++) {
+            if (Character.digit(content.charAt(digit), 16) < 0) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private static char unescape(char escaped) {

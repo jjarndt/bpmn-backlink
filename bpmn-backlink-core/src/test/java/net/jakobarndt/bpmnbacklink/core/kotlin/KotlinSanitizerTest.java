@@ -218,6 +218,11 @@ class KotlinSanitizerTest {
     }
 
     @Test
+    void keepsAUnicodeEscapeWithNonHexDigitsAsPlainText() {
+        assertEquals(List.of("uZZZZ"), literals("\"\\uZZZZ\""));
+    }
+
+    @Test
     void keepsATrailingLoneBackslashAsPlainText() {
         assertEquals(List.of("a\\"), literals("\"a\\\\\""));
     }
