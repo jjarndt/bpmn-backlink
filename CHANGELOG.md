@@ -10,11 +10,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - Multiple source roots are scanned in one run. Maven defaults to the project's
-  compile source roots (as they stand in `process-sources`) plus
-  `src/main/kotlin` when that directory exists; Gradle defaults to
-  `src/main/java` and `src/main/kotlin`. A root that does not exist is skipped,
-  duplicates are collapsed, and the delegates are sorted across all roots so the
-  result does not depend on the order the roots are listed in.
+  compile source roots (as they stand in `process-sources`, minus generated roots
+  below the build directory) plus `src/main/kotlin` when that directory exists;
+  Gradle defaults to `src/main/java` and `src/main/kotlin`. A root that does not
+  exist is skipped, duplicates are collapsed, and the delegates are sorted across
+  all roots so the result does not depend on the order the roots are listed in.
 - New Maven parameter `sourceDirectories` (property
   `bpmnBacklink.sourceDirectories`) and new Gradle property `sourceDirectories`
   to configure the roots explicitly.

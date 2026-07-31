@@ -115,9 +115,11 @@ is a list. It defaults to
 - Maven: the project's compile source roots as they stand in `process-sources`, plus
   `${project.basedir}/src/main/kotlin` if that directory exists. The convention is needed
   because kotlin-maven-plugin reads the compile source roots but never adds its own
-  `<sourceDirs>` to them.
+  `<sourceDirs>` to them. Generated roots below `${project.build.directory}` are left
+  alone.
 - Gradle: `src/main/java` and `src/main/kotlin`, as a layout convention — the plugin does
-  not depend on the `java` or `kotlin` plugin.
+  not depend on the `java` or `kotlin` plugin. `sourceDirectories.from(...)` adds a root to
+  that default, `sourceDirectories = files(...)` replaces it.
 
 A root that does not exist is skipped silently, duplicates are collapsed, and delegates are
 sorted across all roots, so the output does not depend on the order of the roots.
