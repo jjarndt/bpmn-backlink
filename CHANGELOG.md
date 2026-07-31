@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Multiple source roots are scanned in one run. Maven defaults to the project's
+  compile source roots (as they stand in `process-sources`) plus
+  `src/main/kotlin` when that directory exists; Gradle defaults to
+  `src/main/java` and `src/main/kotlin`. A root that does not exist is skipped,
+  duplicates are collapsed, and the delegates are sorted across all roots so the
+  result does not depend on the order the roots are listed in.
+- New Maven parameter `sourceDirectories` (property
+  `bpmnBacklink.sourceDirectories`) and new Gradle property `sourceDirectories`
+  to configure the roots explicitly.
+
+### Changed
+
+- **Breaking (API):** `BacklinkConfig.sourceDirectory` is now
+  `BacklinkConfig.sourceDirectories` (`List<Path>`). `BacklinkConfig.Builder`
+  gained `sourceDirectories(List<Path>)`; `sourceDirectory(Path)` remains as a
+  deprecated convenience for the single-root case.
+
+### Deprecated
+
+- Maven parameter `sourceDirectory` and Gradle property `sourceDirectory`. Both
+  still work: when set explicitly, the named root is the only one scanned.
+
 ## [0.1.0] - 2026-06-16
 
 ### Added
