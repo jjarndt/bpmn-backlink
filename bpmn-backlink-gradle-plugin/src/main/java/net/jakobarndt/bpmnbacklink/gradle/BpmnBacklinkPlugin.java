@@ -99,7 +99,9 @@ public class BpmnBacklinkPlugin implements Plugin<Project> {
     }
 
     private static void applyConventions(BpmnBacklinkExtension extension, Directory projectDirectory) {
-        extension.getSourceDirectories().convention(
+        // setFrom, not convention: ConfigurableFileCollection.convention exists
+        // only from Gradle 8.8 on, and the plugin supports 8.0.
+        extension.getSourceDirectories().setFrom(
                 projectDirectory.dir("src/main/java"),
                 projectDirectory.dir("src/main/kotlin"));
         extension.getBpmnDirectory().convention(projectDirectory.dir("src/main/resources/bpmn/processes"));
@@ -111,7 +113,7 @@ public class BpmnBacklinkPlugin implements Plugin<Project> {
     }
 
     private static void configureCommon(AbstractBacklinkTask task, BpmnBacklinkExtension extension) {
-        task.getSourceDirectories().convention(extension.getSourceDirectories());
+        task.getSourceDirectories().setFrom(extension.getSourceDirectories());
         task.getSourceDirectory().convention(extension.getSourceDirectory());
         task.getBpmnDirectory().convention(extension.getBpmnDirectory());
         task.getBpmnReferenceRoot().convention(extension.getBpmnReferenceRoot());

@@ -28,7 +28,9 @@ public abstract class BpmnBacklinkExtension {
 
     /**
      * @return the source roots that are scanned for delegate types; defaults to
-     *     {@code src/main/java} and {@code src/main/kotlin}, whichever exist
+     *     {@code src/main/java} and {@code src/main/kotlin}, of which the ones
+     *     that do not exist are skipped. {@code from(...)} adds a root to that
+     *     default, {@code setFrom(...)} replaces it.
      */
     public abstract ConfigurableFileCollection getSourceDirectories();
 
