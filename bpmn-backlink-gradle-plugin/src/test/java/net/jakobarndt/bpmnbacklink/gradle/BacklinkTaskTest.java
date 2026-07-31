@@ -73,7 +73,34 @@ class BacklinkTaskTest {
             "</bpmn:definitions>",
             "");
 
+    private static final String KOTLIN_DELEGATE_SOURCE = String.join("\n",
+            "package com.example.delegate",
+            "",
+            "import org.camunda.bpm.engine.delegate.DelegateExecution",
+            "import org.camunda.bpm.engine.delegate.JavaDelegate",
+            "",
+            "class ShipDelegate : JavaDelegate {",
+            "",
+            "    override fun execute(execution: DelegateExecution) {",
+            "        execution.setVariable(\"shipped\", true)",
+            "    }",
+            "}",
+            "");
+
+    private static final String KOTLIN_BPMN_SOURCE = String.join("\n",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"",
+            "                  xmlns:camunda=\"http://camunda.org/schema/1.0/bpmn\"",
+            "                  id=\"defs_ship\" targetNamespace=\"http://example.com/bpmn\">",
+            "  <bpmn:process id=\"shipProcess\" isExecutable=\"true\">",
+            "    <bpmn:serviceTask id=\"ship\" name=\"Ship\"",
+            "                      camunda:delegateExpression=\"${shipDelegate}\"/>",
+            "  </bpmn:process>",
+            "</bpmn:definitions>",
+            "");
+
     private static final String EXPECTED_ANNOTATION = "@CalledFrom(\"bpmn/processes/order.bpmn\")";
+    private static final String EXPECTED_KOTLIN_ANNOTATION = "@CalledFrom(\"bpmn/processes/ship.bpmn\")";
     private static final String EXPECTED_IMPORT = "import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;";
 
     @Test
@@ -127,6 +154,36 @@ class BacklinkTaskTest {
 
         assertFalse(Files.readString(delegateFile, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
                 "check must not write the annotation even when drift is tolerated");
+    }
+
+    @Test
+    void updateAlsoScansTheConventionalKotlinRoot(@TempDir Path projectDir) throws Exception {
+        Path javaDelegate = writeExampleProject(projectDir);
+        Path kotlinDelegate = writeKotlinDelegate(projectDir);
+
+        updateTask(projectWithPlugin(projectDir)).runBacklink();
+
+        assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "the Java root is still scanned");
+        assertTrue(Files.readString(kotlinDelegate, StandardCharsets.UTF_8)
+                        .contains(EXPECTED_KOTLIN_ANNOTATION),
+                "src/main/kotlin is part of the conventional source roots");
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void theDeprecatedSourceDirectoryIsTheOnlyRootWhenSet(@TempDir Path projectDir) throws Exception {
+        Path javaDelegate = writeExampleProject(projectDir);
+        Path kotlinDelegate = writeKotlinDelegate(projectDir);
+
+        UpdateCalledFromTask update = updateTask(projectWithPlugin(projectDir));
+        update.getSourceDirectory().set(projectDir.resolve("src/main/java").toFile());
+        update.runBacklink();
+
+        assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "the deprecated single root must still be honoured");
+        assertFalse(Files.readString(kotlinDelegate, StandardCharsets.UTF_8).contains("CalledFrom"),
+                "an explicit sourceDirectory wins alone, over the conventional roots");
     }
 
     @Test
@@ -216,6 +273,19 @@ class BacklinkTaskTest {
         void invokeHandleResult(BacklinkResult result) {
             handleResult(result);
         }
+    }
+
+    private Path writeKotlinDelegate(Path projectDir) throws IOException {
+        Path sourceDir = projectDir.resolve("src/main/kotlin/com/example/delegate");
+        Files.createDirectories(sourceDir);
+        Path delegateFile = sourceDir.resolve("ShipDelegate.kt");
+        Files.writeString(delegateFile, KOTLIN_DELEGATE_SOURCE, StandardCharsets.UTF_8);
+
+        Path bpmnDir = projectDir.resolve("src/main/resources/bpmn/processes");
+        Files.createDirectories(bpmnDir);
+        Files.writeString(bpmnDir.resolve("ship.bpmn"), KOTLIN_BPMN_SOURCE, StandardCharsets.UTF_8);
+
+        return delegateFile;
     }
 
     private Path writeExampleProject(Path projectDir) throws IOException {

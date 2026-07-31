@@ -48,8 +48,9 @@ public class BpmnBacklinkPlugin implements Plugin<Project> {
     public void apply(Project project) {
         BpmnBacklinkExtension extension =
                 project.getExtensions().create(EXTENSION_NAME, BpmnBacklinkExtension.class);
-        extension.getSourceDirectory()
-                .convention(project.getLayout().getProjectDirectory().dir("src/main/java"));
+        extension.getSourceDirectories().convention(
+                project.getLayout().getProjectDirectory().dir("src/main/java"),
+                project.getLayout().getProjectDirectory().dir("src/main/kotlin"));
         extension.getBpmnDirectory()
                 .convention(project.getLayout().getProjectDirectory().dir("src/main/resources/bpmn/processes"));
         extension.getBpmnReferenceRoot()
@@ -91,6 +92,7 @@ public class BpmnBacklinkPlugin implements Plugin<Project> {
     }
 
     private static void configureCommon(AbstractBacklinkTask task, BpmnBacklinkExtension extension) {
+        task.getSourceDirectories().convention(extension.getSourceDirectories());
         task.getSourceDirectory().convention(extension.getSourceDirectory());
         task.getBpmnDirectory().convention(extension.getBpmnDirectory());
         task.getBpmnReferenceRoot().convention(extension.getBpmnReferenceRoot());

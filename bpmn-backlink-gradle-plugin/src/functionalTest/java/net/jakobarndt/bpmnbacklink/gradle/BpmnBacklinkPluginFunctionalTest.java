@@ -104,8 +104,40 @@ class BpmnBacklinkPluginFunctionalTest {
             "</bpmn:definitions>",
             "");
 
+    private static final String SHIP_DELEGATE = String.join("\n",
+            "package com.example",
+            "",
+            "import org.camunda.bpm.engine.delegate.DelegateExecution",
+            "import org.camunda.bpm.engine.delegate.JavaDelegate",
+            "",
+            "class ShipDelegate : JavaDelegate {",
+            "",
+            "    override fun execute(execution: DelegateExecution) {",
+            "        execution.setVariable(\"shipped\", true)",
+            "    }",
+            "}",
+            "");
+
+    private static final String SHIP_BPMN = String.join("\n",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"",
+            "                  xmlns:camunda=\"http://camunda.org/schema/1.0/bpmn\"",
+            "                  id=\"defs_ship\" targetNamespace=\"http://example.com/bpmn\">",
+            "  <bpmn:process id=\"shipProcess\" isExecutable=\"true\">",
+            "    <bpmn:startEvent id=\"start\"/>",
+            "    <bpmn:serviceTask id=\"ship\" name=\"Ship\"",
+            "                      camunda:delegateExpression=\"${shipDelegate}\"/>",
+            "    <bpmn:endEvent id=\"end\"/>",
+            "    <bpmn:sequenceFlow id=\"f1\" sourceRef=\"start\" targetRef=\"ship\"/>",
+            "    <bpmn:sequenceFlow id=\"f2\" sourceRef=\"ship\" targetRef=\"end\"/>",
+            "  </bpmn:process>",
+            "</bpmn:definitions>",
+            "");
+
     private static final String EXPECTED_ANNOTATION = "@CalledFrom(\"bpmn/processes/demo.bpmn\")";
     private static final String EXPECTED_IMPORT = "import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;";
+    private static final String EXPECTED_KOTLIN_ANNOTATION = "@CalledFrom(\"bpmn/processes/ship.bpmn\")";
+    private static final String EXPECTED_KOTLIN_IMPORT = "import net.jakobarndt.bpmnbacklink.annotation.CalledFrom\n";
 
     @Test
     void buildRunsUpdateThenCheckAndWritesAnnotation(@TempDir Path projectDir) throws IOException {
@@ -123,6 +155,27 @@ class BpmnBacklinkPluginFunctionalTest {
                 "build must write the expected @CalledFrom annotation; got:\n" + source);
         assertTrue(source.contains(EXPECTED_IMPORT),
                 "build must write the CalledFrom import; got:\n" + source);
+    }
+
+    @Test
+    void buildAnnotatesTheKotlinSourceRootAsWell(@TempDir Path projectDir) throws IOException {
+        // The sample applies only the 'java' plugin: the Kotlin file is never
+        // compiled here, which is exactly the point - the scanner reads sources,
+        // and the source root is a layout convention, not a plugin dependency.
+        Path delegateFile = writeSampleProject(projectDir, BUILD_SCRIPT);
+        Path kotlinDelegateFile = writeKotlinDelegate(projectDir);
+
+        BuildResult result = runner(projectDir, "build").build();
+
+        assertEquals(TaskOutcome.SUCCESS, outcomeOf(result, ":bpmnBacklinkCheck"),
+                "check must pass after update annotated both roots");
+        assertTrue(Files.readString(delegateFile, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "the Java root must still be annotated");
+        String kotlinSource = Files.readString(kotlinDelegateFile, StandardCharsets.UTF_8);
+        assertTrue(kotlinSource.contains(EXPECTED_KOTLIN_ANNOTATION),
+                "src/main/kotlin must be scanned by convention; got:\n" + kotlinSource);
+        assertTrue(kotlinSource.contains(EXPECTED_KOTLIN_IMPORT),
+                "the Kotlin import carries no semicolon; got:\n" + kotlinSource);
     }
 
     @Test
@@ -182,6 +235,18 @@ class BpmnBacklinkPluginFunctionalTest {
         org.gradle.testkit.runner.BuildTask task = result.task(taskPath);
         assertNotNull(task, "expected task " + taskPath + " to be part of the build");
         return task.getOutcome();
+    }
+
+    private static Path writeKotlinDelegate(Path projectDir) throws IOException {
+        Path kotlinDir = projectDir.resolve("src/main/kotlin/com/example");
+        Files.createDirectories(kotlinDir);
+        Path delegateFile = kotlinDir.resolve("ShipDelegate.kt");
+        Files.writeString(delegateFile, SHIP_DELEGATE, StandardCharsets.UTF_8);
+
+        Files.writeString(projectDir.resolve("src/main/resources/bpmn/processes/ship.bpmn"),
+                SHIP_BPMN, StandardCharsets.UTF_8);
+
+        return delegateFile;
     }
 
     private static Path writeSampleProject(Path projectDir, String buildScript) throws IOException {
