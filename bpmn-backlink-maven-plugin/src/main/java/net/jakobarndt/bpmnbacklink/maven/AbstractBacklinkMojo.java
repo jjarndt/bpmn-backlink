@@ -44,11 +44,11 @@ public abstract class AbstractBacklinkMojo extends AbstractMojo {
      * The source roots that are scanned for delegate types.
      *
      * <p>By default these are the project's compile source roots as they stand
-     * when the goal runs — which includes every root a plugin such as
-     * kotlin-maven-plugin has registered by then — plus {@code src/main/kotlin}
-     * if that directory exists. The convention is added because a mixed module
-     * that only configures {@code <sourceDirs>} on kotlin-maven-plugin never
-     * registers the root on the project model. Duplicates are collapsed.
+     * when the goal runs (including every root another plugin has registered by
+     * then), plus {@code src/main/kotlin} if that directory exists. The
+     * convention is added because a mixed module that only configures
+     * {@code <sourceDirs>} on kotlin-maven-plugin never registers the root on
+     * the project model. Duplicates are collapsed.
      */
     @Parameter(property = "bpmnBacklink.sourceDirectories")
     private List<File> sourceDirectories;
