@@ -17,6 +17,7 @@ package net.jakobarndt.bpmnbacklink.gradle;
 
 import org.gradle.api.Plugin;
 import org.gradle.api.Project;
+import org.gradle.api.file.Directory;
 import org.gradle.api.tasks.TaskProvider;
 
 import java.util.List;
@@ -48,47 +49,65 @@ public class BpmnBacklinkPlugin implements Plugin<Project> {
     public void apply(Project project) {
         BpmnBacklinkExtension extension =
                 project.getExtensions().create(EXTENSION_NAME, BpmnBacklinkExtension.class);
-        extension.getSourceDirectories().convention(
-                project.getLayout().getProjectDirectory().dir("src/main/java"),
-                project.getLayout().getProjectDirectory().dir("src/main/kotlin"));
-        extension.getBpmnDirectory()
-                .convention(project.getLayout().getProjectDirectory().dir("src/main/resources/bpmn/processes"));
-        extension.getBpmnReferenceRoot()
-                .convention(project.getLayout().getProjectDirectory().dir("src/main/resources"));
-        extension.getSkip().convention(false);
-        extension.getFailOnDrift().convention(true);
-        extension.getUpdateBeforeCompile().convention(true);
-        extension.getCheckOnCheck().convention(true);
+        applyConventions(extension, project.getLayout().getProjectDirectory());
 
-        TaskProvider<UpdateCalledFromTask> update =
-                project.getTasks().register(UPDATE_TASK_NAME, UpdateCalledFromTask.class, task -> {
-                    task.setGroup(TASK_GROUP);
-                    task.setDescription("Rewrites the delegate sources so their @CalledFrom "
-                            + "annotations match the BPMN index.");
-                    configureCommon(task, extension);
-                });
+        TaskProvider<UpdateCalledFromTask> update = registerUpdateTask(project, extension);
+        TaskProvider<CheckCalledFromTask> check = registerCheckTask(project, extension, update);
 
-        TaskProvider<CheckCalledFromTask> check =
-                project.getTasks().register(CHECK_TASK_NAME, CheckCalledFromTask.class, task -> {
-                    task.setGroup(TASK_GROUP);
-                    task.setDescription("Fails the build when a @CalledFrom annotation drifts "
-                            + "from the BPMN index; writes nothing.");
-                    configureCommon(task, extension);
-                    task.getFailOnDrift().convention(extension.getFailOnDrift());
-                    task.mustRunAfter(update);
-                });
+        wireUpdateBeforeCompile(project, extension, update);
+        wireCheckOnCheck(project, extension, check);
+    }
 
-        // The flags are wrapped in providers so they are only read at task-graph
-        // time; users may therefore set them after the plugins block.
+    private static TaskProvider<UpdateCalledFromTask> registerUpdateTask(Project project,
+            BpmnBacklinkExtension extension) {
+        return project.getTasks().register(UPDATE_TASK_NAME, UpdateCalledFromTask.class, task -> {
+            task.setGroup(TASK_GROUP);
+            task.setDescription("Rewrites the delegate sources so their @CalledFrom "
+                    + "annotations match the BPMN index.");
+            configureCommon(task, extension);
+        });
+    }
+
+    private static TaskProvider<CheckCalledFromTask> registerCheckTask(Project project,
+            BpmnBacklinkExtension extension, TaskProvider<UpdateCalledFromTask> update) {
+        return project.getTasks().register(CHECK_TASK_NAME, CheckCalledFromTask.class, task -> {
+            task.setGroup(TASK_GROUP);
+            task.setDescription("Fails the build when a @CalledFrom annotation drifts "
+                    + "from the BPMN index; writes nothing.");
+            configureCommon(task, extension);
+            task.getFailOnDrift().convention(extension.getFailOnDrift());
+            task.mustRunAfter(update);
+        });
+    }
+
+    // The flags are wrapped in providers so they are only read at task-graph
+    // time; users may therefore set them after the plugins block.
+    private static void wireUpdateBeforeCompile(Project project, BpmnBacklinkExtension extension,
+            TaskProvider<UpdateCalledFromTask> update) {
         project.getPluginManager().withPlugin("java", applied ->
                 project.getTasks().named("compileJava", compileJava ->
                         compileJava.dependsOn(project.provider(() ->
                                 extension.getUpdateBeforeCompile().get() ? List.of(update) : List.of()))));
+    }
 
+    private static void wireCheckOnCheck(Project project, BpmnBacklinkExtension extension,
+            TaskProvider<CheckCalledFromTask> check) {
         project.getPluginManager().withPlugin("base", applied ->
                 project.getTasks().named("check", checkLifecycle ->
                         checkLifecycle.dependsOn(project.provider(() ->
                                 extension.getCheckOnCheck().get() ? List.of(check) : List.of()))));
+    }
+
+    private static void applyConventions(BpmnBacklinkExtension extension, Directory projectDirectory) {
+        extension.getSourceDirectories().convention(
+                projectDirectory.dir("src/main/java"),
+                projectDirectory.dir("src/main/kotlin"));
+        extension.getBpmnDirectory().convention(projectDirectory.dir("src/main/resources/bpmn/processes"));
+        extension.getBpmnReferenceRoot().convention(projectDirectory.dir("src/main/resources"));
+        extension.getSkip().convention(false);
+        extension.getFailOnDrift().convention(true);
+        extension.getUpdateBeforeCompile().convention(true);
+        extension.getCheckOnCheck().convention(true);
     }
 
     private static void configureCommon(AbstractBacklinkTask task, BpmnBacklinkExtension extension) {

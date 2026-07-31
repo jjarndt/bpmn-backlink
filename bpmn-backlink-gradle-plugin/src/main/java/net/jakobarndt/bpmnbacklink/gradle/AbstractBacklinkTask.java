@@ -130,10 +130,10 @@ public abstract class AbstractBacklinkTask extends DefaultTask {
      */
     private List<Path> resolveSourceDirectories() {
         if (getSourceDirectory().isPresent()) {
+            File singleRoot = getSourceDirectory().get().getAsFile();
             getLogger().warn("bpmn-backlink: property 'sourceDirectory' is deprecated, "
-                    + "use 'sourceDirectories'; scanning only "
-                    + getSourceDirectory().get().getAsFile());
-            return List.of(getSourceDirectory().get().getAsFile().toPath());
+                    + "use 'sourceDirectories'; scanning only " + singleRoot);
+            return List.of(singleRoot.toPath());
         }
         return getSourceDirectories().getFiles().stream().map(File::toPath).toList();
     }
