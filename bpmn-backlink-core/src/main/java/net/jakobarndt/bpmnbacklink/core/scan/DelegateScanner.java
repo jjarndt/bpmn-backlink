@@ -37,7 +37,11 @@ import java.util.stream.Stream;
  * <p>The roots are collected before anything is parsed, so the reported order is
  * the global file-path order across all of them rather than root-by-root. A root
  * that does not exist is skipped silently, and a file reachable from two roots
- * (nested roots) is scanned once.
+ * (nested roots, or two spellings of the same root) is scanned once.
+ *
+ * <p>A root that is itself a symbolic link is followed to the directory it points
+ * at; symbolic links further down a tree are not followed, which keeps a linked
+ * cycle from ending the scan.
  */
 public final class DelegateScanner {
 
@@ -50,7 +54,7 @@ public final class DelegateScanner {
      * @param sourceDirectories the source roots to scan
      */
     public DelegateScanner(List<Path> sourceDirectories) {
-        this.sourceDirectories = List.copyOf(sourceDirectories);
+        this.sourceDirectories = sourceDirectories.stream().map(Path::normalize).distinct().toList();
     }
 
     /**
@@ -73,10 +77,20 @@ public final class DelegateScanner {
         SortedSet<Path> sourceFiles = new TreeSet<>();
         for (Path sourceDirectory : sourceDirectories) {
             if (Files.isDirectory(sourceDirectory)) {
-                collectSourceFiles(sourceDirectory, sourceFiles);
+                collectSourceFiles(walkableRoot(sourceDirectory), sourceFiles);
             }
         }
         return sourceFiles;
+    }
+
+    // Files.walk reads the attributes of its starting point without following
+    // links, so a root that is a link would be reported as a single entry and its
+    // tree would never be entered.
+    private static Path walkableRoot(Path sourceDirectory) throws IOException {
+        if (Files.isSymbolicLink(sourceDirectory)) {
+            return sourceDirectory.toRealPath();
+        }
+        return sourceDirectory;
     }
 
     private static void collectSourceFiles(Path sourceDirectory, SortedSet<Path> sourceFiles) throws IOException {

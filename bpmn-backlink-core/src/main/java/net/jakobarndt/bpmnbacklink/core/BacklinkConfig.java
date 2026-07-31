@@ -20,6 +20,7 @@ import java.util.Collections;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Immutable configuration for a {@link BacklinkProcessor} run.
@@ -27,8 +28,8 @@ import java.util.Objects;
  * <p>Instances are created through {@link #builder()}.
  *
  * @param sourceDirectories the source roots that are scanned for delegate types
- *     (for example {@code src/main/java} and {@code src/main/kotlin}); duplicate
- *     roots are collapsed and the remaining order is preserved
+ *     (for example {@code src/main/java} and {@code src/main/kotlin}); the roots
+ *     are normalized, duplicates are collapsed and the remaining order is preserved
  * @param bpmnDirectory the root directory below which {@code *.bpmn} files are indexed
  * @param bpmnReferenceRoot the root against which indexed BPMN paths are relativized
  *     before they are stored in an annotation (typically {@code src/main/resources})
@@ -48,7 +49,15 @@ public record BacklinkConfig(List<Path> sourceDirectories, Path bpmnDirectory, P
         Objects.requireNonNull(bpmnDirectory, "bpmnDirectory");
         Objects.requireNonNull(bpmnReferenceRoot, "bpmnReferenceRoot");
         Objects.requireNonNull(mode, "mode");
-        sourceDirectories = List.copyOf(new LinkedHashSet<>(sourceDirectories));
+        sourceDirectories = canonicalRoots(sourceDirectories);
+    }
+
+    private static List<Path> canonicalRoots(List<Path> sourceDirectories) {
+        Set<Path> canonical = new LinkedHashSet<>();
+        for (Path sourceDirectory : sourceDirectories) {
+            canonical.add(Objects.requireNonNull(sourceDirectory, "sourceDirectories").normalize());
+        }
+        return List.copyOf(canonical);
     }
 
     /**

@@ -375,6 +375,23 @@ class BacklinkProcessorTest {
     }
 
     @Test
+    void aRootListedUnderTwoSpellingsIsVisitedOnce(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyDelegates(root, "PaymentDelegate", "PaymentDelegate.java");
+        Path aliasOfSourceRoot = sourceRoot(root).resolve("..").resolve("java");
+
+        BacklinkResult result = new BacklinkProcessor(BacklinkConfig.builder()
+            .sourceDirectories(List.of(sourceRoot(root), aliasOfSourceRoot))
+            .bpmnDirectory(bpmnProcessesDir(root))
+            .bpmnReferenceRoot(resources)
+            .mode(Mode.UPDATE)
+            .build()).run();
+
+        assertEquals(1, result.updated());
+        assertEquals(0, result.unchanged(), "the delegate must not be visited a second time");
+    }
+
+    @Test
     void aSourceRootThatDoesNotExistIsIgnored(@TempDir Path root) {
         Path resources = copyBpmn(root);
         copyDelegates(root, "OrderDelegate", "OrderDelegate.java");

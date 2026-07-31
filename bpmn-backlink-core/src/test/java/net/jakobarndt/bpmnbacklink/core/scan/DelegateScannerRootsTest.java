@@ -76,6 +76,36 @@ class DelegateScannerRootsTest {
     }
 
     @Test
+    void aRootSpelledWithAParentSegmentIsScannedOnce(@TempDir Path root) throws IOException {
+        // A build tool hands over what the user wrote; Maven's absolute paths keep
+        // '..' and '.' segments, so the same root can arrive under two spellings.
+        Path javaRoot = copy(root, "src/main/java", "OrderDelegate.java.txt", "OrderDelegate.java");
+        Path sameRootViaParent = root.resolve("src/main/kotlin").resolve("..").resolve("java");
+
+        assertEquals(List.of("OrderDelegate"), scan(javaRoot, sameRootViaParent),
+            "two spellings of one directory must not duplicate its delegates");
+    }
+
+    @Test
+    void aRootSpelledWithADotSegmentIsScannedOnce(@TempDir Path root) throws IOException {
+        Path javaRoot = copy(root, "src/main/java", "OrderDelegate.java.txt", "OrderDelegate.java");
+        Path sameRootViaDot = root.resolve("src/main").resolve(".").resolve("java");
+
+        assertEquals(List.of("OrderDelegate"), scan(javaRoot, sameRootViaDot),
+            "two spellings of one directory must not duplicate its delegates");
+    }
+
+    @Test
+    void aRootThatIsASymbolicLinkIsScanned(@TempDir Path root) throws IOException {
+        Path realRoot = copy(root, "real/src/main/java", "OrderDelegate.java.txt", "OrderDelegate.java");
+        Path linkedRoot = root.resolve("linked-src");
+        Files.createSymbolicLink(linkedRoot, realRoot);
+
+        assertEquals(List.of("OrderDelegate"), scan(linkedRoot),
+            "a source root reached through a symbolic link must contribute its delegates");
+    }
+
+    @Test
     void aMissingRootIsSkippedSilently(@TempDir Path root) throws IOException {
         Path javaRoot = copy(root, "src/main/java", "OrderDelegate.java.txt", "OrderDelegate.java");
 

@@ -19,6 +19,7 @@ import org.junit.jupiter.api.Test;
 
 import java.nio.file.Path;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -71,6 +72,34 @@ class BacklinkConfigTest {
         BacklinkConfig config = builder().sourceDirectory(JAVA_ROOT).build();
 
         assertEquals(List.of(JAVA_ROOT), config.sourceDirectories());
+    }
+
+    @Test
+    void collapsesTwoSpellingsOfTheSameSourceRoot() {
+        BacklinkConfig config = builder()
+            .sourceDirectories(List.of(JAVA_ROOT, Path.of("src/main/kotlin/../java")))
+            .build();
+
+        assertEquals(List.of(JAVA_ROOT), config.sourceDirectories(),
+            "roots are normalized before they are compared");
+    }
+
+    @Test
+    void rejectsANullSourceRoot() {
+        BacklinkConfig.Builder builder = builder().sourceDirectories(Arrays.asList(JAVA_ROOT, null));
+
+        NullPointerException thrown = assertThrows(NullPointerException.class, builder::build);
+        assertEquals("sourceDirectories", thrown.getMessage(),
+            "a null root must be reported like every other missing value");
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void rejectsANullSingleSourceRoot() {
+        BacklinkConfig.Builder builder = builder().sourceDirectory(null);
+
+        NullPointerException thrown = assertThrows(NullPointerException.class, builder::build);
+        assertEquals("sourceDirectories", thrown.getMessage());
     }
 
     @Test
