@@ -226,6 +226,38 @@ class KotlinDeclarationsTest {
     }
 
     @Test
+    void findsADeclarationNestedInAnotherOne() {
+        String source = "class Outer {\n    class Inner : JavaDelegate\n}\n";
+        assertEquals(List.of("Outer", "Inner"), names(source));
+        assertEquals(List.of("JavaDelegate"), parse(source).get(1).supertypes());
+    }
+
+    @Test
+    void findsANamedCompanionObject() {
+        String source = "class Outer {\n    companion object Named : JavaDelegate\n}\n";
+        assertEquals(List.of("JavaDelegate"), parse(source).get(1).supertypes());
+    }
+
+    @Test
+    void separatesDeclarationsJoinedBySemicolons() {
+        List<KotlinDeclaration> declarations = parse("class Alpha : JavaDelegate; class Beta : Runnable\n");
+        assertEquals(List.of("JavaDelegate"), declarations.get(0).supertypes());
+        assertEquals(List.of("Runnable"), declarations.get(1).supertypes());
+    }
+
+    @Test
+    void readsASupertypeListWithATrailingComma() {
+        assertEquals(List.of("Runnable", "JavaDelegate"),
+            supertypes("class Alpha : Runnable,\n    JavaDelegate,\n{\n}\n"));
+    }
+
+    @Test
+    void readsASupertypeListInterruptedByAComment() {
+        assertEquals(List.of("Runnable", "JavaDelegate"),
+            supertypes("class Alpha : Runnable, /* and */ JavaDelegate {\n}\n"));
+    }
+
+    @Test
     void stopsTheSupertypeListAtAWhereClause() {
         assertEquals(List.of("Runnable"), supertypes("class Alpha<T> : Runnable where T : JavaDelegate {\n}\n"));
     }
