@@ -89,7 +89,22 @@ class BacklinkMojoTest {
             "}",
             "");
 
-    private static final String KOTLIN_BPMN_SOURCE = String.join("\n",
+    private static final String SHIP_DELEGATE_SOURCE = String.join("\n",
+            "package com.example.delegate;",
+            "",
+            "import org.camunda.bpm.engine.delegate.DelegateExecution;",
+            "import org.camunda.bpm.engine.delegate.JavaDelegate;",
+            "",
+            "public class ShipDelegate implements JavaDelegate {",
+            "",
+            "    @Override",
+            "    public void execute(DelegateExecution execution) {",
+            "        execution.setVariable(\"shipped\", true);",
+            "    }",
+            "}",
+            "");
+
+    private static final String SHIP_BPMN_SOURCE = String.join("\n",
             "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
             "<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"",
             "                  xmlns:camunda=\"http://camunda.org/schema/1.0/bpmn\"",
@@ -102,7 +117,7 @@ class BacklinkMojoTest {
             "");
 
     private static final String EXPECTED_ANNOTATION = "@CalledFrom(\"bpmn/processes/order.bpmn\")";
-    private static final String EXPECTED_KOTLIN_ANNOTATION = "@CalledFrom(\"bpmn/processes/ship.bpmn\")";
+    private static final String EXPECTED_SHIP_ANNOTATION = "@CalledFrom(\"bpmn/processes/ship.bpmn\")";
     private static final String EXPECTED_IMPORT = "import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;";
 
     @Test
@@ -266,8 +281,29 @@ class BacklinkMojoTest {
         assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
                 "the Java root is still scanned");
         assertTrue(Files.readString(kotlinDelegate, StandardCharsets.UTF_8)
-                        .contains(EXPECTED_KOTLIN_ANNOTATION),
+                        .contains(EXPECTED_SHIP_ANNOTATION),
                 "the conventional Kotlin root must be scanned as well");
+    }
+
+    @Test
+    void generatedSourceRootsAreLeftAlone(@TempDir Path projectDir) throws Exception {
+        // A root below target/ is generated output: update in process-sources would
+        // never see one that a later phase registers, and check in verify would then
+        // report it as drift that no update can fix.
+        Path javaDelegate = writeExampleProject(projectDir);
+        Path generatedDelegate = writeDelegateBelow(projectDir, "target/generated-sources/annotations");
+
+        UpdateCalledFromMojo update = new UpdateCalledFromMojo();
+        configureCommon(update, projectDir);
+        setField(update, "compileSourceRoots", List.of(
+                projectDir.resolve("src/main/java").toString(),
+                projectDir.resolve("target/generated-sources/annotations").toString()));
+        update.execute();
+
+        assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "the hand-written root is scanned");
+        assertFalse(Files.readString(generatedDelegate, StandardCharsets.UTF_8).contains("CalledFrom"),
+                "a generated source root must not be rewritten");
     }
 
     @Test
@@ -281,7 +317,7 @@ class BacklinkMojoTest {
         update.execute();
 
         assertTrue(Files.readString(kotlinDelegate, StandardCharsets.UTF_8)
-                        .contains(EXPECTED_KOTLIN_ANNOTATION),
+                        .contains(EXPECTED_SHIP_ANNOTATION),
                 "the configured root must be scanned");
         assertFalse(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains("CalledFrom"),
                 "a configured list of roots replaces the compile source roots");
@@ -317,6 +353,28 @@ class BacklinkMojoTest {
                 "an explicit sourceDirectory wins alone, over both the list and the defaults");
     }
 
+    /**
+     * Writes a Java delegate plus the BPMN referencing it into an arbitrary
+     * source root, so a root the project model reports can be driven in a test.
+     *
+     * @param projectDir the example project
+     * @param sourceRoot the source root relative to the project directory
+     * @return the delegate file
+     * @throws IOException if the files cannot be written
+     */
+    private Path writeDelegateBelow(Path projectDir, String sourceRoot) throws IOException {
+        Path sourceDir = projectDir.resolve(sourceRoot).resolve("com/example/delegate");
+        Files.createDirectories(sourceDir);
+        Path delegateFile = sourceDir.resolve("ShipDelegate.java");
+        Files.writeString(delegateFile, SHIP_DELEGATE_SOURCE, StandardCharsets.UTF_8);
+
+        Path bpmnDir = projectDir.resolve("src/main/resources/bpmn/processes");
+        Files.createDirectories(bpmnDir);
+        Files.writeString(bpmnDir.resolve("ship.bpmn"), SHIP_BPMN_SOURCE, StandardCharsets.UTF_8);
+
+        return delegateFile;
+    }
+
     private Path writeKotlinDelegate(Path projectDir) throws IOException {
         Path sourceDir = projectDir.resolve("src/main/kotlin/com/example/delegate");
         Files.createDirectories(sourceDir);
@@ -325,7 +383,7 @@ class BacklinkMojoTest {
 
         Path bpmnDir = projectDir.resolve("src/main/resources/bpmn/processes");
         Files.createDirectories(bpmnDir);
-        Files.writeString(bpmnDir.resolve("ship.bpmn"), KOTLIN_BPMN_SOURCE, StandardCharsets.UTF_8);
+        Files.writeString(bpmnDir.resolve("ship.bpmn"), SHIP_BPMN_SOURCE, StandardCharsets.UTF_8);
 
         return delegateFile;
     }
@@ -349,6 +407,7 @@ class BacklinkMojoTest {
      */
     private void configureCommon(AbstractBacklinkMojo mojo, Path projectDir) {
         setField(mojo, "basedir", projectDir.toFile());
+        setField(mojo, "buildDirectory", projectDir.resolve("target").toFile());
         setField(mojo, "compileSourceRoots", List.of(projectDir.resolve("src/main/java").toString()));
         setField(mojo, "bpmnDirectory", projectDir.resolve("src/main/resources/bpmn/processes").toFile());
         setField(mojo, "bpmnReferenceRoot", projectDir.resolve("src/main/resources").toFile());

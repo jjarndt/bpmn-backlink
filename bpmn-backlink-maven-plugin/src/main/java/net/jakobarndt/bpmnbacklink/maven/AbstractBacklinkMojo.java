@@ -45,10 +45,11 @@ public abstract class AbstractBacklinkMojo extends AbstractMojo {
      *
      * <p>By default these are the project's compile source roots as they stand
      * when the goal runs (including every root another plugin has registered by
-     * then), plus {@code src/main/kotlin} if that directory exists. The
-     * convention is added because a mixed module that only configures
-     * {@code <sourceDirs>} on kotlin-maven-plugin never registers the root on
-     * the project model. Duplicates are collapsed.
+     * then, but excluding generated roots below the build output directory),
+     * plus {@code src/main/kotlin} if that directory exists. The convention is
+     * added because a mixed module that only configures {@code <sourceDirs>} on
+     * kotlin-maven-plugin never registers the root on the project model.
+     * Duplicates are collapsed.
      */
     @Parameter(property = "bpmnBacklink.sourceDirectories")
     private List<File> sourceDirectories;
@@ -74,6 +75,12 @@ public abstract class AbstractBacklinkMojo extends AbstractMojo {
      */
     @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
     private File basedir;
+
+    /**
+     * The build output directory, whose generated source roots are left alone.
+     */
+    @Parameter(defaultValue = "${project.build.directory}", readonly = true, required = true)
+    private File buildDirectory;
 
     /**
      * The root directory below which {@code *.bpmn} files are indexed.
@@ -181,12 +188,30 @@ public abstract class AbstractBacklinkMojo extends AbstractMojo {
     }
 
     private List<Path> defaultSourceDirectories() {
-        List<Path> roots = new ArrayList<>(compileSourceRoots.stream().map(Path::of).toList());
+        List<Path> roots = new ArrayList<>(handWrittenCompileSourceRoots());
         Path kotlinSourceRoot = toPath(basedir).resolve(KOTLIN_SOURCE_ROOT);
         if (Files.isDirectory(kotlinSourceRoot)) {
             roots.add(kotlinSourceRoot);
         }
         return roots;
+    }
+
+    /**
+     * The compile source roots outside the build output directory. Generated roots
+     * are skipped because they are not the sources a backlink belongs in, and
+     * because they come and go across the lifecycle: {@code update} runs in
+     * {@code process-sources} and would never see a root that a later phase adds,
+     * while {@code check} in {@code verify} would report it as unfixable drift.
+     *
+     * @return the source roots the build treats as hand-written
+     */
+    private List<Path> handWrittenCompileSourceRoots() {
+        Path buildOutput = toPath(buildDirectory).normalize();
+        return compileSourceRoots.stream()
+                .map(Path::of)
+                .map(Path::normalize)
+                .filter(root -> !root.startsWith(buildOutput))
+                .toList();
     }
 
     private static Path toPath(File file) {
