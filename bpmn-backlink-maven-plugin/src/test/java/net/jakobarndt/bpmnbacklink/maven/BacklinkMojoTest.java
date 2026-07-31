@@ -75,7 +75,34 @@ class BacklinkMojoTest {
             "</bpmn:definitions>",
             "");
 
+    private static final String KOTLIN_DELEGATE_SOURCE = String.join("\n",
+            "package com.example.delegate",
+            "",
+            "import org.camunda.bpm.engine.delegate.DelegateExecution",
+            "import org.camunda.bpm.engine.delegate.JavaDelegate",
+            "",
+            "class ShipDelegate : JavaDelegate {",
+            "",
+            "    override fun execute(execution: DelegateExecution) {",
+            "        execution.setVariable(\"shipped\", true)",
+            "    }",
+            "}",
+            "");
+
+    private static final String KOTLIN_BPMN_SOURCE = String.join("\n",
+            "<?xml version=\"1.0\" encoding=\"UTF-8\"?>",
+            "<bpmn:definitions xmlns:bpmn=\"http://www.omg.org/spec/BPMN/20100524/MODEL\"",
+            "                  xmlns:camunda=\"http://camunda.org/schema/1.0/bpmn\"",
+            "                  id=\"defs_ship\" targetNamespace=\"http://example.com/bpmn\">",
+            "  <bpmn:process id=\"shipProcess\" isExecutable=\"true\">",
+            "    <bpmn:serviceTask id=\"ship\" name=\"Ship\"",
+            "                      camunda:delegateExpression=\"${shipDelegate}\"/>",
+            "  </bpmn:process>",
+            "</bpmn:definitions>",
+            "");
+
     private static final String EXPECTED_ANNOTATION = "@CalledFrom(\"bpmn/processes/order.bpmn\")";
+    private static final String EXPECTED_KOTLIN_ANNOTATION = "@CalledFrom(\"bpmn/processes/ship.bpmn\")";
     private static final String EXPECTED_IMPORT = "import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;";
 
     @Test
@@ -224,6 +251,85 @@ class BacklinkMojoTest {
         }
     }
 
+    @Test
+    void updateAlsoScansTheConventionalKotlinRoot(@TempDir Path projectDir) throws Exception {
+        // src/main/kotlin is appended to the compile source roots when it exists,
+        // because a module that only configures <sourceDirs> on kotlin-maven-plugin
+        // never registers that root on the project model.
+        Path javaDelegate = writeExampleProject(projectDir);
+        Path kotlinDelegate = writeKotlinDelegate(projectDir);
+
+        UpdateCalledFromMojo update = new UpdateCalledFromMojo();
+        configureCommon(update, projectDir);
+        update.execute();
+
+        assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "the Java root is still scanned");
+        assertTrue(Files.readString(kotlinDelegate, StandardCharsets.UTF_8)
+                        .contains(EXPECTED_KOTLIN_ANNOTATION),
+                "the conventional Kotlin root must be scanned as well");
+    }
+
+    @Test
+    void explicitSourceDirectoriesReplaceTheDefaults(@TempDir Path projectDir) throws Exception {
+        Path javaDelegate = writeExampleProject(projectDir);
+        Path kotlinDelegate = writeKotlinDelegate(projectDir);
+
+        UpdateCalledFromMojo update = new UpdateCalledFromMojo();
+        configureCommon(update, projectDir);
+        setField(update, "sourceDirectories", List.of(projectDir.resolve("src/main/kotlin").toFile()));
+        update.execute();
+
+        assertTrue(Files.readString(kotlinDelegate, StandardCharsets.UTF_8)
+                        .contains(EXPECTED_KOTLIN_ANNOTATION),
+                "the configured root must be scanned");
+        assertFalse(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains("CalledFrom"),
+                "a configured list of roots replaces the compile source roots");
+    }
+
+    @Test
+    void emptySourceDirectoriesFallBackToTheDefaults(@TempDir Path projectDir) throws Exception {
+        Path javaDelegate = writeExampleProject(projectDir);
+
+        UpdateCalledFromMojo update = new UpdateCalledFromMojo();
+        configureCommon(update, projectDir);
+        setField(update, "sourceDirectories", List.of());
+        update.execute();
+
+        assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "an empty list is no configuration at all; the defaults must still apply");
+    }
+
+    @Test
+    void theDeprecatedSourceDirectoryIsTheOnlyRootWhenSet(@TempDir Path projectDir) throws Exception {
+        Path javaDelegate = writeExampleProject(projectDir);
+        Path kotlinDelegate = writeKotlinDelegate(projectDir);
+
+        UpdateCalledFromMojo update = new UpdateCalledFromMojo();
+        configureCommon(update, projectDir);
+        setField(update, "sourceDirectory", projectDir.resolve("src/main/java").toFile());
+        setField(update, "sourceDirectories", List.of(projectDir.resolve("src/main/kotlin").toFile()));
+        update.execute();
+
+        assertTrue(Files.readString(javaDelegate, StandardCharsets.UTF_8).contains(EXPECTED_ANNOTATION),
+                "the deprecated single root must still be honoured");
+        assertFalse(Files.readString(kotlinDelegate, StandardCharsets.UTF_8).contains("CalledFrom"),
+                "an explicit sourceDirectory wins alone, over both the list and the defaults");
+    }
+
+    private Path writeKotlinDelegate(Path projectDir) throws IOException {
+        Path sourceDir = projectDir.resolve("src/main/kotlin/com/example/delegate");
+        Files.createDirectories(sourceDir);
+        Path delegateFile = sourceDir.resolve("ShipDelegate.kt");
+        Files.writeString(delegateFile, KOTLIN_DELEGATE_SOURCE, StandardCharsets.UTF_8);
+
+        Path bpmnDir = projectDir.resolve("src/main/resources/bpmn/processes");
+        Files.createDirectories(bpmnDir);
+        Files.writeString(bpmnDir.resolve("ship.bpmn"), KOTLIN_BPMN_SOURCE, StandardCharsets.UTF_8);
+
+        return delegateFile;
+    }
+
     private Path writeExampleProject(Path projectDir) throws IOException {
         Path sourceDir = projectDir.resolve("src/main/java/com/example/delegate");
         Files.createDirectories(sourceDir);
@@ -237,8 +343,13 @@ class BacklinkMojoTest {
         return delegateFile;
     }
 
+    /**
+     * Configures a goal the way Maven would for a plain Java project: the single
+     * compile source root of the project model, no explicit source directories.
+     */
     private void configureCommon(AbstractBacklinkMojo mojo, Path projectDir) {
-        setField(mojo, "sourceDirectory", projectDir.resolve("src/main/java").toFile());
+        setField(mojo, "basedir", projectDir.toFile());
+        setField(mojo, "compileSourceRoots", List.of(projectDir.resolve("src/main/java").toString()));
         setField(mojo, "bpmnDirectory", projectDir.resolve("src/main/resources/bpmn/processes").toFile());
         setField(mojo, "bpmnReferenceRoot", projectDir.resolve("src/main/resources").toFile());
         setField(mojo, "skip", false);
