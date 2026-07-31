@@ -61,7 +61,7 @@ public final class BacklinkProcessor {
     public BacklinkProcessor(BacklinkConfig config) {
         this.config = Objects.requireNonNull(config, "config");
         this.indexer = new BpmnDelegateIndexer(config.bpmnDirectory(), config.bpmnReferenceRoot());
-        this.scanner = new DelegateScanner(config.sourceDirectory());
+        this.scanner = new DelegateScanner(config.sourceDirectories());
     }
 
     /**

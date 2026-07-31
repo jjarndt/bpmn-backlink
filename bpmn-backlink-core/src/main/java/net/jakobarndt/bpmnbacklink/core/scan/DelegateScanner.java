@@ -21,54 +21,70 @@ import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.SortedSet;
+import java.util.TreeSet;
 import java.util.stream.Stream;
 
 /**
- * Finds concrete delegate types in a source tree without loading any class.
+ * Finds concrete delegate types in one or more source trees without loading any
+ * class.
  *
- * <p>The tree may mix languages: every file is handed to the
+ * <p>A tree may mix languages: every file is handed to the
  * {@link SourceScanner} that claims its extension, currently
  * {@link JavaSourceScanner} for {@code .java} and {@link KotlinSourceScanner}
  * for {@code .kt}. Files that no scanner claims are skipped.
+ *
+ * <p>The roots are collected before anything is parsed, so the reported order is
+ * the global file-path order across all of them rather than root-by-root. A root
+ * that does not exist is skipped silently, and a file reachable from two roots
+ * (nested roots) is scanned once.
  */
 public final class DelegateScanner {
 
     private static final List<SourceScanner> SCANNERS =
         List.of(new JavaSourceScanner(), new KotlinSourceScanner());
 
-    private final Path sourceDirectory;
+    private final List<Path> sourceDirectories;
 
     /**
-     * @param sourceDirectory the source root to scan
+     * @param sourceDirectories the source roots to scan
      */
-    public DelegateScanner(Path sourceDirectory) {
-        this.sourceDirectory = sourceDirectory;
+    public DelegateScanner(List<Path> sourceDirectories) {
+        this.sourceDirectories = List.copyOf(sourceDirectories);
     }
 
     /**
-     * Walks the source tree and collects every concrete delegate type.
+     * Walks the source trees and collects every concrete delegate type.
      *
-     * @return the discovered delegate types, in ascending file-path order
-     * @throws IOException if the source tree cannot be walked or a source file
+     * @return the discovered delegate types, in ascending file-path order across
+     *     all source roots
+     * @throws IOException if a source tree cannot be walked or a source file
      *     cannot be read
      */
     public List<DelegateType> scan() throws IOException {
         List<DelegateType> result = new ArrayList<>();
-        if (!Files.isDirectory(sourceDirectory)) {
-            return result;
-        }
-        List<Path> sourceFiles;
-        try (Stream<Path> paths = Files.walk(sourceDirectory)) {
-            sourceFiles = paths
-                .filter(Files::isRegularFile)
-                .filter(path -> scannerFor(path).isPresent())
-                .sorted()
-                .toList();
-        }
-        for (Path sourceFile : sourceFiles) {
+        for (Path sourceFile : collectSourceFiles()) {
             result.addAll(scannerFor(sourceFile).orElseThrow().scan(sourceFile));
         }
         return result;
+    }
+
+    private SortedSet<Path> collectSourceFiles() throws IOException {
+        SortedSet<Path> sourceFiles = new TreeSet<>();
+        for (Path sourceDirectory : sourceDirectories) {
+            if (Files.isDirectory(sourceDirectory)) {
+                collectSourceFiles(sourceDirectory, sourceFiles);
+            }
+        }
+        return sourceFiles;
+    }
+
+    private static void collectSourceFiles(Path sourceDirectory, SortedSet<Path> sourceFiles) throws IOException {
+        try (Stream<Path> paths = Files.walk(sourceDirectory)) {
+            paths.filter(Files::isRegularFile)
+                .filter(path -> scannerFor(path).isPresent())
+                .forEach(sourceFiles::add);
+        }
     }
 
     private static Optional<SourceScanner> scannerFor(Path sourceFile) {

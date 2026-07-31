@@ -50,7 +50,7 @@ class DelegateScannerTest {
     @Test
     void detectsInterfaceImplementingDelegate(@TempDir Path root) throws IOException {
         copyDelegate(root, "OrderDelegate", "OrderDelegate.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         Set<String> names = found.stream().map(DelegateType::simpleName).collect(Collectors.toSet());
         assertTrue(names.contains("OrderDelegate"));
     }
@@ -58,7 +58,7 @@ class DelegateScannerTest {
     @Test
     void detectsAbstractJavaDelegateSubclass(@TempDir Path root) throws IOException {
         copyDelegate(root, "PaymentDelegate", "PaymentDelegate.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         Set<String> names = found.stream().map(DelegateType::simpleName).collect(Collectors.toSet());
         assertTrue(names.contains("PaymentDelegate"));
     }
@@ -66,27 +66,27 @@ class DelegateScannerTest {
     @Test
     void ignoresAbstractClassEvenIfImplementingDelegate(@TempDir Path root) throws IOException {
         copyDelegate(root, "AbstractJavaDelegate", "AbstractJavaDelegate.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         assertTrue(found.isEmpty(), "abstract delegate base must not be reported");
     }
 
     @Test
     void ignoresPlainClass(@TempDir Path root) throws IOException {
         copyDelegate(root, "NotADelegate", "NotADelegate.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         assertTrue(found.isEmpty());
     }
 
     @Test
     void delegateReferenceIsCamelCasedSimpleName(@TempDir Path root) throws IOException {
         copyDelegate(root, "PaymentDelegate", "PaymentDelegate.java");
-        DelegateType type = new DelegateScanner(sourceRoot).scan().get(0);
+        DelegateType type = new DelegateScanner(List.of(sourceRoot)).scan().get(0);
         assertEquals("paymentDelegate", type.delegateReference());
     }
 
     @Test
     void scanningMissingSourceRootYieldsEmptyList(@TempDir Path root) throws IOException {
-        List<DelegateType> found = new DelegateScanner(root.resolve("does/not/exist")).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(root.resolve("does/not/exist"))).scan();
         assertTrue(found.isEmpty());
     }
 
@@ -95,7 +95,7 @@ class DelegateScannerTest {
         copyDelegate(root, "OrderDelegate", "OrderDelegate.java");
         copyDelegate(root, "ShippingDelegate", "ShippingDelegate.java");
         copyDelegate(root, "NotADelegate", "NotADelegate.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         Set<String> names = found.stream().map(DelegateType::simpleName).collect(Collectors.toSet());
         assertTrue(names.contains("OrderDelegate"));
         assertTrue(names.contains("ShippingDelegate"));
@@ -106,14 +106,14 @@ class DelegateScannerTest {
     @Test
     void ignoresInterfaceThatExtendsDelegate(@TempDir Path root) throws IOException {
         copyDelegate(root, "DelegateInterface", "DelegateInterface.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         assertTrue(found.isEmpty(), "an interface is not a concrete delegate even if it extends JavaDelegate");
     }
 
     @Test
     void detectsDelegateWhenNonDelegateInterfaceIsDeclaredFirst(@TempDir Path root) throws IOException {
         copyDelegate(root, "RunnableDelegate", "RunnableDelegate.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         Set<String> names = found.stream().map(DelegateType::simpleName).collect(Collectors.toSet());
         assertTrue(names.contains("RunnableDelegate"),
             "scanner must look past the first non-delegate interface and still match JavaDelegate");
@@ -122,7 +122,7 @@ class DelegateScannerTest {
     @Test
     void ignoresClassImplementingOnlyNonDelegateInterface(@TempDir Path root) throws IOException {
         copyDelegate(root, "PlainRunnable", "PlainRunnable.java");
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
         assertTrue(found.isEmpty(), "a class with only non-delegate interfaces must be ignored");
     }
 
@@ -138,7 +138,7 @@ class DelegateScannerTest {
             "package net.example.delegate; class Broken { this is not valid java",
             StandardCharsets.UTF_8);
 
-        List<DelegateType> found = new DelegateScanner(sourceRoot).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(sourceRoot)).scan();
 
         Set<String> names = found.stream().map(DelegateType::simpleName).collect(Collectors.toSet());
         assertTrue(names.contains("OrderDelegate"), "valid delegate must still be found");

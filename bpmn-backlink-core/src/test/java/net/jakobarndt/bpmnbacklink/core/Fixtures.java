@@ -94,7 +94,27 @@ final class Fixtures {
      *     pairs, for example {@code "KotlinOrderDelegate", "KotlinOrderDelegate.kt"}
      */
     static void copyKotlinDelegates(Path root, String... fixtureToTarget) {
-        Path packageDir = sourceRoot(root).resolve(DELEGATE_PACKAGE_PATH);
+        copyKotlinDelegatesInto(sourceRoot(root), fixtureToTarget);
+    }
+
+    /**
+     * @param root the temporary workspace root
+     * @return the Kotlin source root inside the workspace, a second root next to
+     *     {@link #sourceRoot(Path)}
+     */
+    static Path kotlinSourceRoot(Path root) {
+        return root.resolve("src/main/kotlin");
+    }
+
+    /**
+     * Copies the named Kotlin delegate fixtures into the delegate package of the
+     * given source root.
+     *
+     * @param sourceRoot the source root to copy into
+     * @param fixtureToTarget alternating fixture base name and target file name pairs
+     */
+    static void copyKotlinDelegatesInto(Path sourceRoot, String... fixtureToTarget) {
+        Path packageDir = sourceRoot.resolve(DELEGATE_PACKAGE_PATH);
         for (int i = 0; i < fixtureToTarget.length; i += 2) {
             copyResource("delegates/" + fixtureToTarget[i] + ".kt.txt", packageDir.resolve(fixtureToTarget[i + 1]));
         }
@@ -117,7 +137,16 @@ final class Fixtures {
      * @return the delegate file path inside the workspace
      */
     static Path delegateFile(Path root, String fileName) {
-        return sourceRoot(root).resolve(DELEGATE_PACKAGE_PATH).resolve(fileName);
+        return delegateFileIn(sourceRoot(root), fileName);
+    }
+
+    /**
+     * @param sourceRoot the source root the delegate lives in
+     * @param fileName the delegate file name, for example {@code OrderDelegate.kt}
+     * @return the delegate file path inside that source root
+     */
+    static Path delegateFileIn(Path sourceRoot, String fileName) {
+        return sourceRoot.resolve(DELEGATE_PACKAGE_PATH).resolve(fileName);
     }
 
     static String read(Path file) {

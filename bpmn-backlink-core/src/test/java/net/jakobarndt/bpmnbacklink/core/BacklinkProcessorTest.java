@@ -32,7 +32,10 @@ import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyBpmn;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyBpmnProcess;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyDelegates;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyKotlinDelegates;
+import static net.jakobarndt.bpmnbacklink.core.Fixtures.copyKotlinDelegatesInto;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.delegateFile;
+import static net.jakobarndt.bpmnbacklink.core.Fixtures.delegateFileIn;
+import static net.jakobarndt.bpmnbacklink.core.Fixtures.kotlinSourceRoot;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.read;
 import static net.jakobarndt.bpmnbacklink.core.Fixtures.sourceRoot;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -44,7 +47,7 @@ class BacklinkProcessorTest {
 
     private BacklinkConfig config(Path root, Path resources, Mode mode) {
         return BacklinkConfig.builder()
-            .sourceDirectory(sourceRoot(root))
+            .sourceDirectories(List.of(sourceRoot(root)))
             .bpmnDirectory(bpmnProcessesDir(root))
             .bpmnReferenceRoot(resources)
             .mode(mode)
@@ -345,5 +348,45 @@ class BacklinkProcessorTest {
         assertEquals(1, result.removed(), "no BPMN references the Kotlin delegate any more");
         String content = read(delegateFile(root, "KotlinOrderDelegate.kt"));
         assertFalse(content.contains("CalledFrom"), "annotation and import must be gone:\n" + content);
+    }
+
+    @Test
+    void updateAnnotatesDelegatesOfSeparateJavaAndKotlinRoots(@TempDir Path root) {
+        // The layout of a mixed module: Java below src/main/java, Kotlin below
+        // src/main/kotlin, both registered as source roots.
+        Path resources = copyBpmn(root);
+        copyBpmnProcess(root, "kotlin.bpmn");
+        copyDelegates(root, "OrderDelegate", "OrderDelegate.java");
+        copyKotlinDelegatesInto(kotlinSourceRoot(root), "KotlinOrderDelegate", "KotlinOrderDelegate.kt");
+
+        BacklinkResult result = new BacklinkProcessor(BacklinkConfig.builder()
+            .sourceDirectories(List.of(sourceRoot(root), kotlinSourceRoot(root)))
+            .bpmnDirectory(bpmnProcessesDir(root))
+            .bpmnReferenceRoot(resources)
+            .mode(Mode.UPDATE)
+            .build()).run();
+
+        assertEquals(2, result.updated(), "both roots must be written in the same run");
+        assertTrue(read(delegateFile(root, "OrderDelegate.java")).contains("@CalledFrom({"),
+            "the delegate of the Java root keeps the Java array form");
+        String kotlin = read(delegateFileIn(kotlinSourceRoot(root), "KotlinOrderDelegate.kt"));
+        assertTrue(kotlin.contains("@CalledFrom(\"bpmn/processes/kotlin.bpmn\")"),
+            "the delegate of the Kotlin root is annotated too:\n" + kotlin);
+    }
+
+    @Test
+    void aSourceRootThatDoesNotExistIsIgnored(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyDelegates(root, "OrderDelegate", "OrderDelegate.java");
+
+        BacklinkResult result = new BacklinkProcessor(BacklinkConfig.builder()
+            .sourceDirectories(List.of(sourceRoot(root), kotlinSourceRoot(root)))
+            .bpmnDirectory(bpmnProcessesDir(root))
+            .bpmnReferenceRoot(resources)
+            .mode(Mode.UPDATE)
+            .build()).run();
+
+        assertEquals(1, result.updated(),
+            "a Java-only module must not fail over its missing Kotlin root");
     }
 }
