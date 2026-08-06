@@ -1,0 +1,20 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * The enclosing type is no delegate; only the nested class is. The annotation
+ * belongs on the nested class, because that is the type the BPMN reference
+ * resolves to.
+ */
+public class DelegateHolder {
+
+    public static class ShippingDelegate implements JavaDelegate {
+
+        @Override
+        public void execute(DelegateExecution execution) {
+            execution.setVariable("shipped", true);
+        }
+    }
+}

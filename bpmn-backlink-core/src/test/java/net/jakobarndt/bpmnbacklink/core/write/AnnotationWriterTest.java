@@ -53,7 +53,7 @@ class AnnotationWriterTest {
     void addsSingleValueAnnotationAndImport(@TempDir Path root) throws IOException {
         Path file = copy(root, "OrderDelegate", "OrderDelegate.java");
 
-        writer.write(file, List.of("bpmn/processes/order.bpmn"));
+        writer.write(file, "OrderDelegate", List.of("bpmn/processes/order.bpmn"));
 
         String content = read(file);
         assertTrue(content.contains("@CalledFrom(\"bpmn/processes/order.bpmn\")"),
@@ -66,7 +66,7 @@ class AnnotationWriterTest {
     void addsMultiValueAnnotationWithBraces(@TempDir Path root) throws IOException {
         Path file = copy(root, "OrderDelegate", "OrderDelegate.java");
 
-        writer.write(file, List.of("bpmn/processes/order.bpmn", "bpmn/processes/sub/shipping.bpmn"));
+        writer.write(file, "OrderDelegate", List.of("bpmn/processes/order.bpmn", "bpmn/processes/sub/shipping.bpmn"));
 
         String content = read(file);
         assertTrue(content.contains("@CalledFrom({"), "multi value must use braces, was:\n" + content);
@@ -79,9 +79,9 @@ class AnnotationWriterTest {
         Path file = copy(root, "OrderDelegate", "OrderDelegate.java");
         List<String> values = List.of("bpmn/processes/order.bpmn", "bpmn/processes/sub/shipping.bpmn");
 
-        writer.write(file, values);
+        writer.write(file, "OrderDelegate", values);
 
-        assertEquals(values, writer.readCurrentValues(file));
+        assertEquals(values, writer.readCurrentValues(file, "OrderDelegate"));
     }
 
     @Test
@@ -90,14 +90,14 @@ class AnnotationWriterTest {
 
         assertEquals(
             List.of("bpmn/processes/order.bpmn", "bpmn/processes/sub/shipping.bpmn"),
-            writer.readCurrentValues(file));
+            writer.readCurrentValues(file, "OrderDelegate"));
     }
 
     @Test
     void preservesSurroundingFormattingAndComments(@TempDir Path root) throws IOException {
         Path file = copy(root, "OrderDelegate", "OrderDelegate.java");
 
-        writer.write(file, List.of("bpmn/processes/order.bpmn"));
+        writer.write(file, "OrderDelegate", List.of("bpmn/processes/order.bpmn"));
 
         String content = read(file);
         assertTrue(content.contains("This Javadoc and the spacing below must survive a rewrite."),
@@ -112,7 +112,7 @@ class AnnotationWriterTest {
     void removingAnnotationAlsoRemovesUnusedImport(@TempDir Path root) throws IOException {
         Path file = copy(root, "ObsoleteDelegate", "ObsoleteDelegate.java");
 
-        writer.write(file, List.of());
+        writer.write(file, "ObsoleteDelegate", List.of());
 
         String content = read(file);
         assertFalse(content.contains("@CalledFrom"), "annotation must be gone");
@@ -125,9 +125,9 @@ class AnnotationWriterTest {
     void updatesExistingAnnotationToNewValueSet(@TempDir Path root) throws IOException {
         Path file = copy(root, "ObsoleteDelegate", "ObsoleteDelegate.java");
 
-        writer.write(file, List.of("bpmn/processes/new.bpmn"));
+        writer.write(file, "ObsoleteDelegate", List.of("bpmn/processes/new.bpmn"));
 
-        assertEquals(List.of("bpmn/processes/new.bpmn"), writer.readCurrentValues(file));
+        assertEquals(List.of("bpmn/processes/new.bpmn"), writer.readCurrentValues(file, "ObsoleteDelegate"));
         String content = read(file);
         assertFalse(content.contains("gone.bpmn"), "old value must be replaced");
     }
@@ -135,7 +135,7 @@ class AnnotationWriterTest {
     @Test
     void readCurrentValuesReturnsEmptyWhenNoAnnotation(@TempDir Path root) throws IOException {
         Path file = copy(root, "OrderDelegate", "OrderDelegate.java");
-        assertTrue(writer.readCurrentValues(file).isEmpty());
+        assertTrue(writer.readCurrentValues(file, "OrderDelegate").isEmpty());
     }
 
     @Test
@@ -144,61 +144,63 @@ class AnnotationWriterTest {
 
         assertEquals(
             List.of("bpmn/processes/order.bpmn", "bpmn/processes/sub/shipping.bpmn"),
-            writer.readCurrentValues(file));
+            writer.readCurrentValues(file, "NormalAnnotatedDelegate"));
     }
 
     @Test
-    void readCurrentValuesIsEmptyForCompilationUnitWithoutTopLevelType(@TempDir Path root) throws IOException {
+    void readCurrentValuesIsEmptyWhenTheNamedTypeIsAbsent(@TempDir Path root) throws IOException {
         Path file = copy(root, "PackageInfo", "package-info.java");
-        assertTrue(writer.readCurrentValues(file).isEmpty(),
-            "a unit without any type carries no annotation values");
+        assertTrue(writer.readCurrentValues(file, "OrderDelegate").isEmpty(),
+            "a unit without that type carries no annotation values");
     }
 
     @Test
-    void writeFailsWhenNoTopLevelTypeExists(@TempDir Path root) throws IOException {
+    void writeFailsWhenTheNamedTypeIsAbsent(@TempDir Path root) throws IOException {
         Path file = copy(root, "PackageInfo", "package-info.java");
 
         IllegalStateException ex = assertThrows(IllegalStateException.class,
-            () -> writer.write(file, List.of("bpmn/processes/order.bpmn")));
-        assertTrue(ex.getMessage().contains("No top-level type"), "message must name the cause");
+            () -> writer.write(file, "OrderDelegate", List.of("bpmn/processes/order.bpmn")));
+        assertTrue(ex.getMessage().contains("No type OrderDelegate"), "message must name the missing type");
     }
 
     @Test
-    void usesFirstDeclaredTypeWhenNoPrimaryTypeIsPresent(@TempDir Path root) throws IOException {
+    void annotatesTheNamedTypeEvenWhenItIsNotTheFirstDeclaredOne(@TempDir Path root) throws IOException {
         Path file = copy(root, "NoPrimaryType", "NoPrimaryType.java");
 
-        writer.write(file, List.of("bpmn/processes/order.bpmn"));
+        writer.write(file, "SecondHelper", List.of("bpmn/processes/order.bpmn"));
 
         String content = read(file);
-        // The annotation must land on the first declared type, FirstHelper.
         int annotationIndex = content.indexOf("@CalledFrom");
         int firstHelperIndex = content.indexOf("class FirstHelper");
         int secondHelperIndex = content.indexOf("class SecondHelper");
         assertTrue(annotationIndex >= 0, "annotation must be written");
-        assertTrue(annotationIndex < firstHelperIndex,
-            "annotation must precede the first declared type");
-        assertTrue(firstHelperIndex < secondHelperIndex, "type order preserved");
-        assertEquals(List.of("bpmn/processes/order.bpmn"), writer.readCurrentValues(file));
+        assertTrue(firstHelperIndex < annotationIndex,
+            "annotation must not land on the first declared type:\n" + content);
+        assertTrue(annotationIndex < secondHelperIndex,
+            "annotation must precede the named type:\n" + content);
+        assertEquals(List.of("bpmn/processes/order.bpmn"), writer.readCurrentValues(file, "SecondHelper"));
+        assertTrue(writer.readCurrentValues(file, "FirstHelper").isEmpty(),
+            "the other type must stay untouched");
     }
 
     @Test
     void readingMarkerAnnotationYieldsNoValues(@TempDir Path root) throws IOException {
         Path file = copy(root, "MarkerCalledFromDelegate", "MarkerCalledFromDelegate.java");
-        assertTrue(writer.readCurrentValues(file).isEmpty(),
+        assertTrue(writer.readCurrentValues(file, "MarkerCalledFromDelegate").isEmpty(),
             "a bare marker @CalledFrom carries no values");
     }
 
     @Test
     void readingNormalAnnotationWithNonValuePairYieldsNoValues(@TempDir Path root) throws IOException {
         Path file = copy(root, "OtherPairDelegate", "OtherPairDelegate.java");
-        assertTrue(writer.readCurrentValues(file).isEmpty(),
+        assertTrue(writer.readCurrentValues(file, "OtherPairDelegate").isEmpty(),
             "a member pair not named 'value' must be skipped");
     }
 
     @Test
     void readingNonStringLiteralValueYieldsNoValues(@TempDir Path root) throws IOException {
         Path file = copy(root, "NonStringValueDelegate", "NonStringValueDelegate.java");
-        assertTrue(writer.readCurrentValues(file).isEmpty(),
+        assertTrue(writer.readCurrentValues(file, "NonStringValueDelegate").isEmpty(),
             "a non-string-literal value must contribute nothing");
     }
 
@@ -206,7 +208,7 @@ class AnnotationWriterTest {
     void removingTypeAnnotationKeepsImportWhenFullyQualifiedUsageRemains(@TempDir Path root) throws IOException {
         Path file = copy(root, "FqnRemainingDelegate", "FqnRemainingDelegate.java");
 
-        writer.write(file, List.of());
+        writer.write(file, "FqnRemainingDelegate", List.of());
 
         String content = read(file);
         assertFalse(content.contains("@CalledFrom(\"bpmn/processes/gone.bpmn\")"),
@@ -222,7 +224,7 @@ class AnnotationWriterTest {
         throws IOException {
         Path file = copy(root, "MixedImportsDelegate", "MixedImportsDelegate.java");
 
-        writer.write(file, List.of());
+        writer.write(file, "MixedImportsDelegate", List.of());
 
         String content = read(file);
         assertFalse(content.contains("@CalledFrom"), "annotation must be gone");
@@ -238,7 +240,7 @@ class AnnotationWriterTest {
     void removingTypeAnnotationKeepsImportWhenAnotherAnnotationRemains(@TempDir Path root) throws IOException {
         Path file = copy(root, "SecondAnnotationDelegate", "SecondAnnotationDelegate.java");
 
-        writer.write(file, List.of());
+        writer.write(file, "SecondAnnotationDelegate", List.of());
 
         String content = read(file);
         assertTrue(content.contains("@CalledFrom(\"bpmn/processes/other.bpmn\")"),
@@ -247,5 +249,33 @@ class AnnotationWriterTest {
             "type-level annotation must be removed");
         assertTrue(content.contains("import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;"),
             "import must stay because it is still used by the method annotation");
+    }
+
+    @Test
+    void removingTypeAnnotationKeepsImportWhenAnotherTypeOfTheFileStillCarriesIt(@TempDir Path root)
+        throws IOException {
+        Path file = copy(root, "TwoAnnotatedTypesDelegate", "TwoAnnotatedTypesDelegate.java");
+
+        writer.write(file, "TwoAnnotatedTypesDelegate", List.of());
+
+        String content = read(file);
+        assertFalse(content.contains("gone.bpmn"), "the addressed type must lose its annotation:\n" + content);
+        assertEquals(List.of("bpmn/processes/kept.bpmn"), writer.readCurrentValues(file, "CompanionDelegate"),
+            "the companion type must keep its annotation");
+        assertTrue(content.contains("import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;"),
+            "import must stay because the companion type still uses it:\n" + content);
+    }
+
+    @Test
+    void removingTheLastTypeAnnotationOfAFileDropsTheImport(@TempDir Path root) throws IOException {
+        Path file = copy(root, "TwoAnnotatedTypesDelegate", "TwoAnnotatedTypesDelegate.java");
+
+        writer.write(file, "TwoAnnotatedTypesDelegate", List.of());
+        writer.write(file, "CompanionDelegate", List.of());
+
+        String content = read(file);
+        assertFalse(content.contains("@CalledFrom"), "no annotation may remain:\n" + content);
+        assertFalse(content.contains("import net.jakobarndt.bpmnbacklink.annotation.CalledFrom;"),
+            "the now unused import must be removed:\n" + content);
     }
 }

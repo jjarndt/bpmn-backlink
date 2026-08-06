@@ -203,6 +203,61 @@ class BacklinkProcessorTest {
     }
 
     @Test
+    void updateAnnotatesEveryTopLevelDelegateOfASharedFile(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyDelegates(root, "TwoDelegatesInOneFile", "Delegates.java");
+
+        BacklinkResult result = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+
+        assertEquals(2, result.updated(), "both delegates of the file count as updated");
+        assertEquals(0, result.removed());
+        assertEquals(0, result.unchanged());
+
+        String content = read(delegateFile(root, "Delegates.java"));
+        int paymentAnnotation = content.indexOf("@CalledFrom(\"bpmn/processes/order.bpmn\")");
+        int paymentClass = content.indexOf("class PaymentDelegate");
+        int shippingAnnotation = content.indexOf("@CalledFrom(\"bpmn/processes/sub/shipping.bpmn\")");
+        int shippingClass = content.indexOf("class ShippingDelegate");
+        assertTrue(paymentAnnotation >= 0 && paymentAnnotation < paymentClass,
+            "payment delegate must carry its own annotation:\n" + content);
+        assertTrue(paymentClass < shippingAnnotation && shippingAnnotation < shippingClass,
+            "shipping delegate must carry its own annotation:\n" + content);
+    }
+
+    @Test
+    void secondRunOverASharedFileReportsBothDelegatesAsUnchanged(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyDelegates(root, "TwoDelegatesInOneFile", "Delegates.java");
+
+        new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+        String afterFirst = read(delegateFile(root, "Delegates.java"));
+        BacklinkResult second = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+
+        assertEquals(0, second.updated());
+        assertEquals(2, second.unchanged(), "neither delegate may overwrite the other");
+        assertEquals(afterFirst, read(delegateFile(root, "Delegates.java")),
+            "a second run must not change the file byte for byte");
+    }
+
+    @Test
+    void updateAnnotatesTheNestedDelegateInsteadOfItsEnclosingType(@TempDir Path root) {
+        Path resources = copyBpmn(root);
+        copyDelegates(root, "NestedShippingDelegate", "DelegateHolder.java");
+
+        BacklinkResult result = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+
+        assertEquals(1, result.updated());
+        String content = read(delegateFile(root, "DelegateHolder.java"));
+        int holderIndex = content.indexOf("class DelegateHolder");
+        int annotationIndex = content.indexOf("@CalledFrom(\"bpmn/processes/sub/shipping.bpmn\")");
+        int nestedIndex = content.indexOf("class ShippingDelegate");
+        assertTrue(holderIndex < annotationIndex,
+            "annotation must not land on the enclosing type:\n" + content);
+        assertTrue(annotationIndex < nestedIndex,
+            "annotation must precede the nested delegate:\n" + content);
+    }
+
+    @Test
     void updateThenCheckYieldsNoDrift(@TempDir Path root) {
         Path resources = copyBpmn(root);
         copyDelegates(root,

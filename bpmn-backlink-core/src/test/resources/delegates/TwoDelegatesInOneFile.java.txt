@@ -1,0 +1,24 @@
+package net.example.delegate;
+
+import org.camunda.bpm.engine.delegate.DelegateExecution;
+import org.camunda.bpm.engine.delegate.JavaDelegate;
+
+/**
+ * Two top-level delegates in a single compilation unit, each referenced by a
+ * different process. Both must end up with their own annotation.
+ */
+class PaymentDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("paid", true);
+    }
+}
+
+class ShippingDelegate implements JavaDelegate {
+
+    @Override
+    public void execute(DelegateExecution execution) {
+        execution.setVariable("shipped", true);
+    }
+}
