@@ -96,7 +96,7 @@ All parameters have sensible defaults and can be overridden — in Maven via the
 
 | Parameter             | Default                                | Applies to               |
 |-----------------------|----------------------------------------|--------------------------|
-| `sourceDirectory`     | `src/main/java`                        | update, check            |
+| `sourceDirectories`   | see below                              | update, check            |
 | `bpmnDirectory`       | `src/main/resources/bpmn/processes`    | update, check            |
 | `bpmnReferenceRoot`   | `src/main/resources`                   | update, check            |
 | `skip`                | `false`                                | update, check            |
@@ -106,6 +106,26 @@ All parameters have sensible defaults and can be overridden — in Maven via the
 
 BPMN paths are stored relative to `bpmnReferenceRoot` using `/` separators, so they line up
 with classpath-relative deployment paths and stay navigable from the IDE.
+
+### Source roots
+
+Mixed Java/Kotlin modules keep their delegates in more than one root, so `sourceDirectories`
+is a list. It defaults to
+
+- Maven: the project's compile source roots as they stand in `process-sources`, plus
+  `${project.basedir}/src/main/kotlin` if that directory exists. The convention is needed
+  because kotlin-maven-plugin reads the compile source roots but never adds its own
+  `<sourceDirs>` to them. Generated roots below `${project.build.directory}` are left
+  alone.
+- Gradle: `src/main/java` and `src/main/kotlin`, as a layout convention — the plugin does
+  not depend on the `java` or `kotlin` plugin. `sourceDirectories.from(...)` adds a root to
+  that default, `sourceDirectories = files(...)` replaces it.
+
+A root that does not exist is skipped silently, duplicates are collapsed, and delegates are
+sorted across all roots, so the output does not depend on the order of the roots.
+
+The old single-root parameter `sourceDirectory` still works but is deprecated; when it is
+set explicitly, it is the only root that is scanned.
 
 ## Goals and tasks
 

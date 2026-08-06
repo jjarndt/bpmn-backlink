@@ -1,0 +1,125 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Mixed Java/Kotlin consumer project for the bpmn-backlink integration test.
+
+    The layout is the one the Kotlin documentation prescribes for mixed modules:
+    kotlin-maven-plugin compiles src/main/kotlin (and reads src/main/java) in
+    process-sources, maven-compiler-plugin compiles the Java sources afterwards.
+    The Kotlin source root is only named in <sourceDirs>, so whether it reaches
+    ${project.compileSourceRoots} is up to kotlin-maven-plugin - which is exactly
+    what this test exists to pin down. The update goal must annotate both
+    delegates regardless, and the check goal must then find no drift.
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0"
+         xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/xsd/maven-4.0.0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <groupId>net.jakobarndt.bpmnbacklink.it</groupId>
+    <artifactId>mixed-java-kotlin</artifactId>
+    <version>1.0-SNAPSHOT</version>
+    <packaging>jar</packaging>
+
+    <properties>
+        <maven.compiler.release>17</maven.compiler.release>
+        <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+        <kotlin.version>2.2.21</kotlin.version>
+    </properties>
+
+    <dependencies>
+        <!-- Provides the @CalledFrom annotation that the plugin writes into both delegates. -->
+        <dependency>
+            <groupId>net.jakobarndt.bpmnbacklink</groupId>
+            <artifactId>bpmn-backlink-annotation</artifactId>
+            <version>@project.version@</version>
+        </dependency>
+
+        <!-- Both delegates implement org.camunda.bpm.engine.delegate.JavaDelegate. -->
+        <dependency>
+            <groupId>org.camunda.bpm</groupId>
+            <artifactId>camunda-engine</artifactId>
+            <version>7.23.0</version>
+        </dependency>
+
+        <dependency>
+            <groupId>org.jetbrains.kotlin</groupId>
+            <artifactId>kotlin-stdlib</artifactId>
+            <version>${kotlin.version}</version>
+        </dependency>
+    </dependencies>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>net.jakobarndt.bpmnbacklink</groupId>
+                <artifactId>bpmn-backlink-maven-plugin</artifactId>
+                <version>@project.version@</version>
+                <executions>
+                    <execution>
+                        <id>backlink-update</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>update</goal>
+                        </goals>
+                    </execution>
+                    <execution>
+                        <id>backlink-check</id>
+                        <phase>verify</phase>
+                        <goals>
+                            <goal>check</goal>
+                        </goals>
+                        <configuration>
+                            <failOnDrift>true</failOnDrift>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jetbrains.kotlin</groupId>
+                <artifactId>kotlin-maven-plugin</artifactId>
+                <version>${kotlin.version}</version>
+                <configuration>
+                    <jvmTarget>17</jvmTarget>
+                </configuration>
+                <executions>
+                    <execution>
+                        <id>compile</id>
+                        <phase>process-sources</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                        <configuration>
+                            <sourceDirs>
+                                <sourceDir>${project.basedir}/src/main/kotlin</sourceDir>
+                                <sourceDir>${project.basedir}/src/main/java</sourceDir>
+                            </sourceDirs>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-compiler-plugin</artifactId>
+                <version>3.13.0</version>
+                <executions>
+                    <!-- Kotlin has to see the Java sources first, so the default
+                         compile execution is replaced by one that runs after it. -->
+                    <execution>
+                        <id>default-compile</id>
+                        <phase>none</phase>
+                    </execution>
+                    <execution>
+                        <id>java-compile</id>
+                        <phase>compile</phase>
+                        <goals>
+                            <goal>compile</goal>
+                        </goals>
+                    </execution>
+                </executions>
+            </plugin>
+        </plugins>
+    </build>
+
+</project>

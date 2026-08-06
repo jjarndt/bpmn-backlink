@@ -22,6 +22,7 @@ import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.io.TempDir;
 
 import java.nio.file.Path;
+import java.util.List;
 import java.util.Set;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -46,9 +47,12 @@ class BpmnBacklinkPluginTest {
 
         BpmnBacklinkExtension extension =
                 project.getExtensions().getByType(BpmnBacklinkExtension.class);
-        assertEquals(projectDir.resolve("src/main/java").toFile(),
-                extension.getSourceDirectory().get().getAsFile(),
-                "sourceDirectory must default to src/main/java");
+        assertEquals(List.of(projectDir.resolve("src/main/java").toFile(),
+                        projectDir.resolve("src/main/kotlin").toFile()),
+                List.copyOf(extension.getSourceDirectories().getFiles()),
+                "sourceDirectories must default to src/main/java and src/main/kotlin");
+        assertFalse(extension.getSourceDirectory().isPresent(),
+                "the deprecated sourceDirectory must have no convention, so setting it is detectable");
         assertEquals(projectDir.resolve("src/main/resources/bpmn/processes").toFile(),
                 extension.getBpmnDirectory().get().getAsFile(),
                 "bpmnDirectory must default to src/main/resources/bpmn/processes");
@@ -74,7 +78,8 @@ class BpmnBacklinkPluginTest {
         Project project = projectWithPlugin(projectDir);
         BpmnBacklinkExtension extension =
                 project.getExtensions().getByType(BpmnBacklinkExtension.class);
-        extension.getSourceDirectory().set(projectDir.resolve("custom/java").toFile());
+        extension.getSourceDirectories().setFrom(projectDir.resolve("custom/java").toFile(),
+                projectDir.resolve("custom/kotlin").toFile());
         extension.getBpmnDirectory().set(projectDir.resolve("custom/bpmn").toFile());
         extension.getBpmnReferenceRoot().set(projectDir.resolve("custom").toFile());
         extension.getSkip().set(true);
@@ -85,9 +90,10 @@ class BpmnBacklinkPluginTest {
         CheckCalledFromTask check = (CheckCalledFromTask)
                 project.getTasks().getByName(BpmnBacklinkPlugin.CHECK_TASK_NAME);
 
-        assertEquals(projectDir.resolve("custom/java").toFile(),
-                update.getSourceDirectory().get().getAsFile(),
-                "the task must follow the extension's sourceDirectory");
+        assertEquals(List.of(projectDir.resolve("custom/java").toFile(),
+                        projectDir.resolve("custom/kotlin").toFile()),
+                List.copyOf(update.getSourceDirectories().getFiles()),
+                "the task must follow the extension's sourceDirectories");
         assertEquals(projectDir.resolve("custom/bpmn").toFile(),
                 check.getBpmnDirectory().get().getAsFile(),
                 "the task must follow the extension's bpmnDirectory");
@@ -97,6 +103,22 @@ class BpmnBacklinkPluginTest {
         assertTrue(update.getSkip().get(), "the task must follow the extension's skip flag");
         assertFalse(check.getFailOnDrift().get(),
                 "the check task must follow the extension's failOnDrift flag");
+    }
+
+    @Test
+    @SuppressWarnings("deprecation")
+    void theDeprecatedSourceDirectoryFlowsIntoTheTasks(@TempDir Path projectDir) throws Exception {
+        projectDir = projectDir.toRealPath();
+        Project project = projectWithPlugin(projectDir);
+        project.getExtensions().getByType(BpmnBacklinkExtension.class)
+                .getSourceDirectory().set(projectDir.resolve("legacy/java").toFile());
+
+        UpdateCalledFromTask update = (UpdateCalledFromTask)
+                project.getTasks().getByName(BpmnBacklinkPlugin.UPDATE_TASK_NAME);
+
+        assertEquals(projectDir.resolve("legacy/java").toFile(),
+                update.getSourceDirectory().get().getAsFile(),
+                "the task must still follow the extension's deprecated sourceDirectory");
     }
 
     @Test

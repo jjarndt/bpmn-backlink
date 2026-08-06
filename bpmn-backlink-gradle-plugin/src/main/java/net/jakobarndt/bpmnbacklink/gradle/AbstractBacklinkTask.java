@@ -21,6 +21,7 @@ import net.jakobarndt.bpmnbacklink.core.BacklinkResult;
 import net.jakobarndt.bpmnbacklink.core.Mode;
 import org.gradle.api.DefaultTask;
 import org.gradle.api.GradleException;
+import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.provider.Property;
 import org.gradle.api.specs.Specs;
@@ -28,7 +29,10 @@ import org.gradle.api.tasks.Internal;
 import org.gradle.api.tasks.TaskAction;
 import org.gradle.work.DisableCachingByDefault;
 
+import java.io.File;
 import java.io.UncheckedIOException;
+import java.nio.file.Path;
+import java.util.List;
 
 /**
  * Shared base for the backlink tasks. It holds the common properties, assembles
@@ -50,8 +54,17 @@ public abstract class AbstractBacklinkTask extends DefaultTask {
     }
 
     /**
-     * @return the Java source root that is scanned for delegate types
+     * @return the source roots that are scanned for delegate types
      */
+    @Internal
+    public abstract ConfigurableFileCollection getSourceDirectories();
+
+    /**
+     * @return the Java source root that is scanned for delegate types
+     * @deprecated use {@link #getSourceDirectories()}; when this property is set
+     *     it is the only root that is scanned
+     */
+    @Deprecated(since = "0.2.0")
     @Internal
     public abstract DirectoryProperty getSourceDirectory();
 
@@ -89,7 +102,7 @@ public abstract class AbstractBacklinkTask extends DefaultTask {
         }
 
         BacklinkConfig config = BacklinkConfig.builder()
-                .sourceDirectory(getSourceDirectory().get().getAsFile().toPath())
+                .sourceDirectories(resolveSourceDirectories())
                 .bpmnDirectory(getBpmnDirectory().get().getAsFile().toPath())
                 .bpmnReferenceRoot(getBpmnReferenceRoot().get().getAsFile().toPath())
                 .mode(mode())
@@ -107,6 +120,22 @@ public abstract class AbstractBacklinkTask extends DefaultTask {
         }
 
         handleResult(result);
+    }
+
+    /**
+     * Determines which roots the run scans. The deprecated
+     * {@link #getSourceDirectory()} wins on its own when it is set.
+     *
+     * @return the source roots to scan
+     */
+    private List<Path> resolveSourceDirectories() {
+        if (getSourceDirectory().isPresent()) {
+            File singleRoot = getSourceDirectory().get().getAsFile();
+            getLogger().warn("bpmn-backlink: property 'sourceDirectory' is deprecated, "
+                    + "use 'sourceDirectories'; scanning only " + singleRoot);
+            return List.of(singleRoot.toPath());
+        }
+        return getSourceDirectories().getFiles().stream().map(File::toPath).toList();
     }
 
     /**

@@ -16,34 +16,48 @@
 package net.jakobarndt.bpmnbacklink.core;
 
 import java.nio.file.Path;
+import java.util.Collections;
+import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Objects;
+import java.util.Set;
 
 /**
  * Immutable configuration for a {@link BacklinkProcessor} run.
  *
  * <p>Instances are created through {@link #builder()}.
  *
- * @param sourceDirectory the Java source root that is scanned for delegate types
- *     (for example {@code src/main/java})
+ * @param sourceDirectories the source roots that are scanned for delegate types
+ *     (for example {@code src/main/java} and {@code src/main/kotlin}); the roots
+ *     are normalized, duplicates are collapsed and the remaining order is preserved
  * @param bpmnDirectory the root directory below which {@code *.bpmn} files are indexed
  * @param bpmnReferenceRoot the root against which indexed BPMN paths are relativized
  *     before they are stored in an annotation (typically {@code src/main/resources})
  * @param mode the operating mode
  */
-public record BacklinkConfig(Path sourceDirectory, Path bpmnDirectory, Path bpmnReferenceRoot, Mode mode) {
+public record BacklinkConfig(List<Path> sourceDirectories, Path bpmnDirectory, Path bpmnReferenceRoot, Mode mode) {
 
     /**
-     * @param sourceDirectory the Java source root to scan
+     * @param sourceDirectories the source roots to scan
      * @param bpmnDirectory the root directory of the BPMN files to index
      * @param bpmnReferenceRoot the root against which BPMN paths are relativized
      * @param mode the operating mode
-     * @throws NullPointerException if any argument is {@code null}
+     * @throws NullPointerException if any argument or source root is {@code null}
      */
     public BacklinkConfig {
-        Objects.requireNonNull(sourceDirectory, "sourceDirectory");
+        Objects.requireNonNull(sourceDirectories, "sourceDirectories");
         Objects.requireNonNull(bpmnDirectory, "bpmnDirectory");
         Objects.requireNonNull(bpmnReferenceRoot, "bpmnReferenceRoot");
         Objects.requireNonNull(mode, "mode");
+        sourceDirectories = canonicalRoots(sourceDirectories);
+    }
+
+    private static List<Path> canonicalRoots(List<Path> sourceDirectories) {
+        Set<Path> canonical = new LinkedHashSet<>();
+        for (Path sourceDirectory : sourceDirectories) {
+            canonical.add(Objects.requireNonNull(sourceDirectory, "sourceDirectories").normalize());
+        }
+        return List.copyOf(canonical);
     }
 
     /**
@@ -58,7 +72,7 @@ public record BacklinkConfig(Path sourceDirectory, Path bpmnDirectory, Path bpmn
      */
     public static final class Builder {
 
-        private Path sourceDirectory;
+        private List<Path> sourceDirectories;
         private Path bpmnDirectory;
         private Path bpmnReferenceRoot;
         private Mode mode = Mode.UPDATE;
@@ -67,12 +81,26 @@ public record BacklinkConfig(Path sourceDirectory, Path bpmnDirectory, Path bpmn
         }
 
         /**
-         * @param sourceDirectory the Java source root to scan
+         * @param sourceDirectories the source roots to scan
          * @return this builder
          */
-        public Builder sourceDirectory(Path sourceDirectory) {
-            this.sourceDirectory = sourceDirectory;
+        public Builder sourceDirectories(List<Path> sourceDirectories) {
+            this.sourceDirectories = sourceDirectories;
             return this;
+        }
+
+        /**
+         * Convenience for the single-root case.
+         *
+         * @param sourceDirectory the source root to scan
+         * @return this builder
+         * @deprecated use {@link #sourceDirectories(List)}; a build may have more
+         *     than one source root (for example {@code src/main/java} and
+         *     {@code src/main/kotlin})
+         */
+        @Deprecated(since = "0.2.0")
+        public Builder sourceDirectory(Path sourceDirectory) {
+            return sourceDirectories(Collections.singletonList(sourceDirectory));
         }
 
         /**
@@ -107,7 +135,7 @@ public record BacklinkConfig(Path sourceDirectory, Path bpmnDirectory, Path bpmn
          * @throws NullPointerException if a required field was not set
          */
         public BacklinkConfig build() {
-            return new BacklinkConfig(sourceDirectory, bpmnDirectory, bpmnReferenceRoot, mode);
+            return new BacklinkConfig(sourceDirectories, bpmnDirectory, bpmnReferenceRoot, mode);
         }
     }
 }

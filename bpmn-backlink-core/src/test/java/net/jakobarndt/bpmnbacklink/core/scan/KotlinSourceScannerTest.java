@@ -49,7 +49,7 @@ class KotlinSourceScannerTest {
     }
 
     private List<String> scan() throws IOException {
-        return new DelegateScanner(sourceRoot).scan().stream().map(DelegateType::simpleName).toList();
+        return new DelegateScanner(List.of(sourceRoot)).scan().stream().map(DelegateType::simpleName).toList();
     }
 
     @Test
@@ -70,7 +70,9 @@ class KotlinSourceScannerTest {
     void delegateReferenceOfAKotlinTypeIsTheCamelCasedName(@TempDir Path root) throws IOException {
         copy(root, "KotlinOrderDelegate.kt.txt", "KotlinOrderDelegate.kt");
 
-        assertEquals("kotlinOrderDelegate", new DelegateScanner(sourceRoot).scan().get(0).delegateReference());
+        DelegateType found = new DelegateScanner(List.of(sourceRoot)).scan().get(0);
+
+        assertEquals("kotlinOrderDelegate", found.delegateReference());
     }
 
     @Test

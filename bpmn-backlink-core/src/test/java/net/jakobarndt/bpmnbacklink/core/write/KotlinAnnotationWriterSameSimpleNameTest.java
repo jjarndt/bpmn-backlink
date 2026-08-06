@@ -59,7 +59,7 @@ class KotlinAnnotationWriterSameSimpleNameTest {
     void anAmbiguousSimpleNameResolvesToTheFirstDeclarationInSourceOrder(@TempDir Path root)
         throws IOException {
         Path file = copyIntoSourceRoot(root);
-        List<DelegateType> found = new DelegateScanner(root.resolve("src/main/kotlin")).scan();
+        List<DelegateType> found = new DelegateScanner(List.of(root.resolve("src/main/kotlin"))).scan();
 
         assertEquals(2, found.size(), "both nested delegates are reported: " + found);
         for (DelegateType delegate : found) {

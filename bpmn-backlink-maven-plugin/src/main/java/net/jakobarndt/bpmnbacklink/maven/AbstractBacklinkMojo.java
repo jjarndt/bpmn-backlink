@@ -26,7 +26,10 @@ import org.apache.maven.plugins.annotations.Parameter;
 
 import java.io.File;
 import java.io.UncheckedIOException;
+import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.ArrayList;
+import java.util.List;
 
 /**
  * Shared base for the backlink goals. It holds the common parameters, assembles
@@ -35,11 +38,49 @@ import java.nio.file.Path;
  */
 public abstract class AbstractBacklinkMojo extends AbstractMojo {
 
+    private static final String KOTLIN_SOURCE_ROOT = "src/main/kotlin";
+
+    /**
+     * The source roots that are scanned for delegate types.
+     *
+     * <p>By default these are the project's compile source roots as they stand
+     * when the goal runs (including every root another plugin has registered by
+     * then, but excluding generated roots below the build output directory),
+     * plus {@code src/main/kotlin} if that directory exists. The convention is
+     * added because a mixed module that only configures {@code <sourceDirs>} on
+     * kotlin-maven-plugin never registers the root on the project model.
+     * Duplicates are collapsed.
+     */
+    @Parameter(property = "bpmnBacklink.sourceDirectories")
+    private List<File> sourceDirectories;
+
     /**
      * The Java source root that is scanned for delegate types.
+     *
+     * @deprecated use {@link #sourceDirectories}; when this parameter is set
+     *     explicitly it is the only root that is scanned
      */
-    @Parameter(defaultValue = "${project.build.sourceDirectory}", property = "bpmnBacklink.sourceDirectory")
+    @Deprecated(since = "0.2.0")
+    @Parameter(property = "bpmnBacklink.sourceDirectory")
     private File sourceDirectory;
+
+    /**
+     * The project's compile source roots, the default for {@link #sourceDirectories}.
+     */
+    @Parameter(defaultValue = "${project.compileSourceRoots}", readonly = true, required = true)
+    private List<String> compileSourceRoots;
+
+    /**
+     * The project directory, used to locate the conventional Kotlin source root.
+     */
+    @Parameter(defaultValue = "${project.basedir}", readonly = true, required = true)
+    private File basedir;
+
+    /**
+     * The build output directory, whose generated source roots are left alone.
+     */
+    @Parameter(defaultValue = "${project.build.directory}", readonly = true, required = true)
+    private File buildDirectory;
 
     /**
      * The root directory below which {@code *.bpmn} files are indexed.
@@ -79,7 +120,7 @@ public abstract class AbstractBacklinkMojo extends AbstractMojo {
         }
 
         BacklinkConfig config = BacklinkConfig.builder()
-                .sourceDirectory(toPath(sourceDirectory))
+                .sourceDirectories(resolveSourceDirectories())
                 .bpmnDirectory(toPath(bpmnDirectory))
                 .bpmnReferenceRoot(toPath(bpmnReferenceRoot))
                 .mode(mode())
@@ -125,6 +166,52 @@ public abstract class AbstractBacklinkMojo extends AbstractMojo {
         getLog().info("bpmn-backlink: updated=" + result.updated()
                 + ", removed=" + result.removed()
                 + ", unchanged=" + result.unchanged());
+    }
+
+    /**
+     * Determines which roots the run scans. The deprecated
+     * {@link #sourceDirectory} wins on its own when it is set explicitly, then
+     * an explicit {@link #sourceDirectories}, then the default.
+     *
+     * @return the source roots to scan
+     */
+    private List<Path> resolveSourceDirectories() {
+        if (sourceDirectory != null) {
+            getLog().warn("bpmn-backlink: parameter 'sourceDirectory' is deprecated, "
+                    + "use 'sourceDirectories'; scanning only " + sourceDirectory);
+            return List.of(toPath(sourceDirectory));
+        }
+        if (sourceDirectories != null && !sourceDirectories.isEmpty()) {
+            return sourceDirectories.stream().map(AbstractBacklinkMojo::toPath).toList();
+        }
+        return defaultSourceDirectories();
+    }
+
+    private List<Path> defaultSourceDirectories() {
+        List<Path> roots = new ArrayList<>(handWrittenCompileSourceRoots());
+        Path kotlinSourceRoot = toPath(basedir).resolve(KOTLIN_SOURCE_ROOT);
+        if (Files.isDirectory(kotlinSourceRoot)) {
+            roots.add(kotlinSourceRoot);
+        }
+        return roots;
+    }
+
+    /**
+     * The compile source roots outside the build output directory. Generated roots
+     * are skipped because they are not the sources a backlink belongs in, and
+     * because they come and go across the lifecycle: {@code update} runs in
+     * {@code process-sources} and would never see a root that a later phase adds,
+     * while {@code check} in {@code verify} would report it as unfixable drift.
+     *
+     * @return the source roots the build treats as hand-written
+     */
+    private List<Path> handWrittenCompileSourceRoots() {
+        Path buildOutput = toPath(buildDirectory).normalize();
+        return compileSourceRoots.stream()
+                .map(Path::of)
+                .map(Path::normalize)
+                .filter(root -> !root.startsWith(buildOutput))
+                .toList();
     }
 
     private static Path toPath(File file) {

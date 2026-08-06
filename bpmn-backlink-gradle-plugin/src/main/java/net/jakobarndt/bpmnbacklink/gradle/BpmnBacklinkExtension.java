@@ -15,6 +15,7 @@
  */
 package net.jakobarndt.bpmnbacklink.gradle;
 
+import org.gradle.api.file.ConfigurableFileCollection;
 import org.gradle.api.file.DirectoryProperty;
 import org.gradle.api.provider.Property;
 
@@ -26,8 +27,19 @@ import org.gradle.api.provider.Property;
 public abstract class BpmnBacklinkExtension {
 
     /**
-     * @return the Java source root that is scanned for delegate types
+     * @return the source roots that are scanned for delegate types; defaults to
+     *     {@code src/main/java} and {@code src/main/kotlin}, of which the ones
+     *     that do not exist are skipped. {@code from(...)} adds a root to that
+     *     default, {@code setFrom(...)} replaces it.
      */
+    public abstract ConfigurableFileCollection getSourceDirectories();
+
+    /**
+     * @return the Java source root that is scanned for delegate types
+     * @deprecated use {@link #getSourceDirectories()}; when this property is set
+     *     it is the only root that is scanned
+     */
+    @Deprecated(since = "0.2.0")
     public abstract DirectoryProperty getSourceDirectory();
 
     /**
