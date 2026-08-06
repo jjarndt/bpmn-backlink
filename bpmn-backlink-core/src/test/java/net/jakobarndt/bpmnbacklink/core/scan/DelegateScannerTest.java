@@ -25,6 +25,7 @@ import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -82,6 +83,56 @@ class DelegateScannerTest {
         copyDelegate(root, "PaymentDelegate", "PaymentDelegate.java");
         DelegateType type = new DelegateScanner(List.of(sourceRoot)).scan().get(0);
         assertEquals("paymentDelegate", type.delegateReference());
+        assertEquals("paymentDelegate",
+            new DelegateType(type.sourceFile(), type.simpleName()).delegateReference());
+    }
+
+    @Test
+    void explicitJavaBeanNamesOverrideTheDefaultReference(@TempDir Path root) throws IOException {
+        Path packageDir = root.resolve("src/main/java/net/example/delegate");
+        Files.createDirectories(packageDir);
+        Files.writeString(packageDir.resolve("NamedDelegates.java"), """
+            package net.example.delegate;
+
+            @Component("componentBean")
+            class ComponentDelegate implements JavaDelegate {}
+
+            @Service(value = "serviceBean")
+            class ServiceDelegate implements JavaDelegate {}
+
+            @jakarta.inject.Named("namedBean")
+            class NamedDelegate implements JavaDelegate {}
+
+            @Component("")
+            class BlankDelegate implements JavaDelegate {}
+
+            @Component
+            class MarkerDelegate implements JavaDelegate {}
+
+            @Service(BEAN_NAME)
+            class DynamicDelegate implements JavaDelegate {}
+
+            @Other("otherBean")
+            class OtherDelegate implements JavaDelegate {}
+
+            @Component(name = "ignored")
+            @Named("secondAnnotationBean")
+            class SecondAnnotationDelegate implements JavaDelegate {}
+            """, StandardCharsets.UTF_8);
+        sourceRoot = root.resolve("src/main/java");
+
+        Map<String, String> references = new DelegateScanner(List.of(sourceRoot)).scan().stream()
+            .collect(Collectors.toMap(DelegateType::simpleName, DelegateType::delegateReference));
+
+        assertEquals(Map.of(
+            "ComponentDelegate", "componentBean",
+            "ServiceDelegate", "serviceBean",
+            "NamedDelegate", "namedBean",
+            "BlankDelegate", "blankDelegate",
+            "MarkerDelegate", "markerDelegate",
+            "DynamicDelegate", "dynamicDelegate",
+            "OtherDelegate", "otherDelegate",
+            "SecondAnnotationDelegate", "secondAnnotationBean"), references);
     }
 
     @Test

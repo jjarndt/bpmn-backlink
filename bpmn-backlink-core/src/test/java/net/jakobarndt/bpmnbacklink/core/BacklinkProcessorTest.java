@@ -22,6 +22,7 @@ import org.junit.jupiter.api.io.TempDir;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.attribute.PosixFilePermissions;
@@ -301,6 +302,40 @@ class BacklinkProcessorTest {
         String shipping = read(delegateFile(root, "KotlinShippingDelegate.kt"));
         assertTrue(shipping.contains("@CalledFrom(\"bpmn/processes/kotlin.bpmn\")\nopen class KotlinShippingDelegate"),
             "a camunda:class reference resolves to the Kotlin type too:\n" + shipping);
+    }
+
+    @Test
+    void updateMatchesExplicitJavaAndKotlinBeanNames(@TempDir Path root) throws IOException {
+        Path resources = copyBpmn(root);
+        Path packageDir = sourceRoot(root).resolve(Fixtures.DELEGATE_PACKAGE_PATH);
+        Files.createDirectories(packageDir);
+        Path javaDelegate = packageDir.resolve("ExplicitJavaDelegate.java");
+        Files.writeString(javaDelegate, """
+            package net.example.delegate;
+
+            @Component("orderDelegate")
+            class ExplicitJavaDelegate implements JavaDelegate {
+            }
+            """, StandardCharsets.UTF_8);
+        Path kotlinDelegate = packageDir.resolve("ExplicitKotlinDelegate.kt");
+        Files.writeString(kotlinDelegate, """
+            package net.example.delegate
+
+            @Named("shippingDelegate")
+            class ExplicitKotlinDelegate : JavaDelegate
+            """, StandardCharsets.UTF_8);
+
+        BacklinkResult result = new BacklinkProcessor(config(root, resources, Mode.UPDATE)).run();
+
+        assertEquals(2, result.updated());
+        String java = read(javaDelegate);
+        assertTrue(java.contains("@CalledFrom({"),
+            "the explicit Java bean matches both orderDelegate expressions:\n" + java);
+        assertTrue(java.contains("bpmn/processes/order.bpmn"));
+        assertTrue(java.contains("bpmn/processes/sub/shipping.bpmn"));
+        String kotlin = read(kotlinDelegate);
+        assertTrue(kotlin.contains("@CalledFrom(\"bpmn/processes/sub/shipping.bpmn\")"),
+            "the explicit Kotlin bean matches the shippingDelegate expression:\n" + kotlin);
     }
 
     @Test
