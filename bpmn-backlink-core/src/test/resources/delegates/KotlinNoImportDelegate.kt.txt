@@ -1,0 +1,3 @@
+package net.example.delegate
+
+class KotlinNoImportDelegate : JavaDelegate

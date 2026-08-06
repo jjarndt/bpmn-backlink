@@ -1,0 +1,5 @@
+package net.example.delegate
+
+import java.time.Clock
+
+class KotlinLowImportDelegate(private val clock: Clock) : JavaDelegate

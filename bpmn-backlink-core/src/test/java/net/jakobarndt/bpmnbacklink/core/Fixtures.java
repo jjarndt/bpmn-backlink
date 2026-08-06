@@ -86,6 +86,32 @@ final class Fixtures {
     }
 
     /**
+     * Copies the named Kotlin delegate fixtures into the delegate package of the
+     * workspace source root, so a single source tree can mix both languages.
+     *
+     * @param root the temporary workspace root
+     * @param fixtureToTarget alternating fixture base name and target file name
+     *     pairs, for example {@code "KotlinOrderDelegate", "KotlinOrderDelegate.kt"}
+     */
+    static void copyKotlinDelegates(Path root, String... fixtureToTarget) {
+        Path packageDir = sourceRoot(root).resolve(DELEGATE_PACKAGE_PATH);
+        for (int i = 0; i < fixtureToTarget.length; i += 2) {
+            copyResource("delegates/" + fixtureToTarget[i] + ".kt.txt", packageDir.resolve(fixtureToTarget[i + 1]));
+        }
+    }
+
+    /**
+     * Copies an additional BPMN fixture into the process directory of the
+     * workspace, alongside the ones {@link #copyBpmn(Path)} provides.
+     *
+     * @param root the temporary workspace root
+     * @param fixture the fixture file name below {@code bpmn/processes}
+     */
+    static void copyBpmnProcess(Path root, String fixture) {
+        copyResource("bpmn/processes/" + fixture, bpmnProcessesDir(root).resolve(fixture));
+    }
+
+    /**
      * @param root the temporary workspace root
      * @param fileName the delegate file name, for example {@code OrderDelegate.java}
      * @return the delegate file path inside the workspace

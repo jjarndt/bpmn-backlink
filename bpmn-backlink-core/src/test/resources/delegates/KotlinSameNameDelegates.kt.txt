@@ -1,0 +1,13 @@
+package net.example.delegate
+
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+object KotlinOrders {
+
+    class KotlinNamesakeDelegate : JavaDelegate
+}
+
+object KotlinShipping {
+
+    class KotlinNamesakeDelegate : JavaDelegate
+}

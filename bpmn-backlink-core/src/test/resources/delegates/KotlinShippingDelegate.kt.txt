@@ -1,0 +1,11 @@
+package net.example.delegate
+
+import net.example.base.AbstractJavaDelegate
+import org.camunda.bpm.engine.delegate.DelegateExecution
+
+open class KotlinShippingDelegate : AbstractJavaDelegate() {
+
+    override fun execute(execution: DelegateExecution) {
+        execution.setVariable("shipped", true)
+    }
+}

@@ -1,0 +1,3 @@
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+class KotlinNoPackageDelegate : JavaDelegate

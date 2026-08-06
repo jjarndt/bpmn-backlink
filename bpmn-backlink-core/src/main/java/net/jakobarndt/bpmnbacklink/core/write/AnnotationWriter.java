@@ -53,13 +53,16 @@ import java.util.stream.Stream;
  * <p>All operations are idempotent: applying the same expected value twice
  * produces no second change.
  */
-public final class AnnotationWriter {
+public final class AnnotationWriter implements AnnotationEditor {
 
-    public static final String ANNOTATION_SIMPLE_NAME = "CalledFrom";
-
-    public static final String ANNOTATION_FQN = "net.jakobarndt.bpmnbacklink.annotation.CalledFrom";
+    private static final String JAVA_SUFFIX = ".java";
 
     private static final String ANNOTATION_VALUE_ATTRIBUTE = "value";
+
+    @Override
+    public boolean supports(Path sourceFile) {
+        return sourceFile.getFileName().toString().endsWith(JAVA_SUFFIX);
+    }
 
     /**
      * Reads the BPMN paths currently stored in the {@code @CalledFrom}
@@ -71,6 +74,7 @@ public final class AnnotationWriter {
      *     the annotation is absent or the annotation carries no value
      * @throws IOException if the file cannot be read
      */
+    @Override
     public List<String> readCurrentValues(Path javaFile, String typeName) throws IOException {
         CompilationUnit unit = parse(javaFile);
         return findType(unit, typeName)
@@ -95,29 +99,30 @@ public final class AnnotationWriter {
      * @throws IOException if the file cannot be read or written
      * @throws IllegalStateException if the file declares no such type
      */
+    @Override
     public void write(Path javaFile, String typeName, List<String> expected) throws IOException {
         CompilationUnit unit = parse(javaFile);
         TypeDeclaration<?> type = findType(unit, typeName)
             .orElseThrow(() -> new IllegalStateException("No type " + typeName + " in " + javaFile));
 
         Optional<AnnotationExpr> current = type.getAnnotationByName(ANNOTATION_SIMPLE_NAME);
-
         if (expected.isEmpty()) {
             current.ifPresent(AnnotationExpr::remove);
             removeImportIfUnused(unit);
         } else {
-            AnnotationExpr annotation = buildAnnotation(expected);
-            if (current.isPresent()) {
-                // Replacing in place keeps the indentation of the annotated type.
-                current.get().replace(annotation);
-            } else {
-                type.addAnnotation(annotation);
-            }
-            ensureImport(unit);
+            applyAnnotation(unit, type, current, expected);
         }
 
         String rendered = LexicalPreservingPrinter.print(unit);
         Files.writeString(javaFile, rendered, StandardCharsets.UTF_8);
+    }
+
+    private void applyAnnotation(CompilationUnit unit, TypeDeclaration<?> type,
+        Optional<AnnotationExpr> current, List<String> expected) {
+        AnnotationExpr annotation = buildAnnotation(expected);
+        // Replacing in place keeps the indentation of the annotated type.
+        current.ifPresentOrElse(present -> present.replace(annotation), () -> type.addAnnotation(annotation));
+        ensureImport(unit);
     }
 
     private CompilationUnit parse(Path javaFile) throws IOException {

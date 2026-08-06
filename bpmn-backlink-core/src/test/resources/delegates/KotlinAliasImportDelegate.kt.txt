@@ -1,0 +1,6 @@
+package net.example.delegate
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom as Backlink
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+class KotlinAliasImportDelegate : JavaDelegate

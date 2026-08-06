@@ -1,0 +1,16 @@
+package net.example.delegate
+
+import net.jakobarndt.bpmnbacklink.annotation.CalledFrom
+import org.camunda.bpm.engine.delegate.JavaDelegate
+import org.springframework.stereotype.Component
+
+/**
+ * Carries a foreign annotation with arguments and one without, both of which
+ * must survive and keep their order.
+ */
+@Component("kotlinDecoratedDelegate")
+@Deprecated
+@CalledFrom("bpmn/processes/old.bpmn")
+internal class KotlinDecoratedDelegate @Inject constructor(
+    private val clock: Any,
+) : JavaDelegate

@@ -1,0 +1,9 @@
+package net.example.delegate
+
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+/** A raw string that carries Windows line endings as data, not as file structure. */
+const val TEMPLATE = """first
+second"""
+
+class KotlinRawStringCrlfDelegate : JavaDelegate

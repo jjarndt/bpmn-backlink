@@ -1,0 +1,15 @@
+package net.example.delegate
+
+import org.camunda.bpm.engine.delegate.DelegateExecution
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+/**
+ * Places an order. This KDoc and the spacing below must survive a rewrite.
+ */
+class KotlinOrderDelegate : JavaDelegate {
+
+    // a deliberately oddly placed comment
+    override fun execute(execution: DelegateExecution) {
+        execution.setVariable("ordered", true)
+    }
+}

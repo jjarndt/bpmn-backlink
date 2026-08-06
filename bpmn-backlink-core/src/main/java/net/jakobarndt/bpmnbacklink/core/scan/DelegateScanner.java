@@ -15,43 +15,31 @@
  */
 package net.jakobarndt.bpmnbacklink.core.scan;
 
-import com.github.javaparser.StaticJavaParser;
-import com.github.javaparser.ast.CompilationUnit;
-import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
-import com.github.javaparser.ast.type.ClassOrInterfaceType;
-import net.jakobarndt.bpmnbacklink.core.util.Names;
-
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Set;
+import java.util.Optional;
 import java.util.stream.Stream;
 
 /**
- * Finds concrete Java delegate types in a source tree without loading any
- * class, using JavaParser on the source level.
+ * Finds concrete delegate types in a source tree without loading any class.
  *
- * <p>A type qualifies as a delegate when it is a concrete (non-abstract,
- * non-interface) class that either implements {@code JavaDelegate} or extends
- * {@code AbstractJavaDelegate}. The supertypes are matched by their simple
- * names, so both imported and fully qualified references are recognised.
+ * <p>The tree may mix languages: every file is handed to the
+ * {@link SourceScanner} that claims its extension, currently
+ * {@link JavaSourceScanner} for {@code .java} and {@link KotlinSourceScanner}
+ * for {@code .kt}. Files that no scanner claims are skipped.
  */
 public final class DelegateScanner {
 
-    private static final String JAVA_SUFFIX = ".java";
-
-    /** Interface simple names that mark a delegate when implemented. */
-    static final Set<String> DELEGATE_INTERFACES = Set.of("JavaDelegate");
-
-    /** Superclass simple names that mark a delegate when extended. */
-    static final Set<String> DELEGATE_SUPERCLASSES = Set.of("AbstractJavaDelegate");
+    private static final List<SourceScanner> SCANNERS =
+        List.of(new JavaSourceScanner(), new KotlinSourceScanner());
 
     private final Path sourceDirectory;
 
     /**
-     * @param sourceDirectory the Java source root to scan
+     * @param sourceDirectory the source root to scan
      */
     public DelegateScanner(Path sourceDirectory) {
         this.sourceDirectory = sourceDirectory;
@@ -61,61 +49,31 @@ public final class DelegateScanner {
      * Walks the source tree and collects every concrete delegate type.
      *
      * @return the discovered delegate types, in ascending file-path order
-     * @throws IOException if the source tree cannot be walked
+     * @throws IOException if the source tree cannot be walked or a source file
+     *     cannot be read
      */
     public List<DelegateType> scan() throws IOException {
         List<DelegateType> result = new ArrayList<>();
         if (!Files.isDirectory(sourceDirectory)) {
             return result;
         }
-        List<Path> javaFiles;
+        List<Path> sourceFiles;
         try (Stream<Path> paths = Files.walk(sourceDirectory)) {
-            javaFiles = paths
+            sourceFiles = paths
                 .filter(Files::isRegularFile)
-                .filter(p -> p.getFileName().toString().endsWith(JAVA_SUFFIX))
+                .filter(path -> scannerFor(path).isPresent())
                 .sorted()
                 .toList();
         }
-        for (Path javaFile : javaFiles) {
-            scanFile(javaFile, result);
+        for (Path sourceFile : sourceFiles) {
+            result.addAll(scannerFor(sourceFile).orElseThrow().scan(sourceFile));
         }
         return result;
     }
 
-    private void scanFile(Path javaFile, List<DelegateType> result) throws IOException {
-        CompilationUnit unit;
-        try {
-            unit = StaticJavaParser.parse(javaFile);
-        } catch (RuntimeException parseFailure) {
-            // A source file that does not parse cannot be a delegate we can rewrite.
-            return;
-        }
-        unit.findAll(ClassOrInterfaceDeclaration.class).stream()
-            .filter(this::isConcreteDelegate)
-            .forEach(type -> result.add(new DelegateType(javaFile, type.getNameAsString())));
-    }
-
-    private boolean isConcreteDelegate(ClassOrInterfaceDeclaration type) {
-        if (type.isInterface() || type.isAbstract()) {
-            return false;
-        }
-        return implementsDelegateInterface(type) || extendsDelegateSuperclass(type);
-    }
-
-    private boolean implementsDelegateInterface(ClassOrInterfaceDeclaration type) {
-        return matchesAny(type.getImplementedTypes(), DELEGATE_INTERFACES);
-    }
-
-    private boolean extendsDelegateSuperclass(ClassOrInterfaceDeclaration type) {
-        return matchesAny(type.getExtendedTypes(), DELEGATE_SUPERCLASSES);
-    }
-
-    private boolean matchesAny(Iterable<ClassOrInterfaceType> declaredTypes, Set<String> simpleNames) {
-        for (ClassOrInterfaceType declared : declaredTypes) {
-            if (simpleNames.contains(Names.simpleName(declared.getNameWithScope()))) {
-                return true;
-            }
-        }
-        return false;
+    private static Optional<SourceScanner> scannerFor(Path sourceFile) {
+        return SCANNERS.stream()
+            .filter(scanner -> scanner.supports(sourceFile))
+            .findFirst();
     }
 }

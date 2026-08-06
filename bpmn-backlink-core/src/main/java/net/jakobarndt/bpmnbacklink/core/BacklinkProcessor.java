@@ -18,7 +18,8 @@ package net.jakobarndt.bpmnbacklink.core;
 import net.jakobarndt.bpmnbacklink.core.bpmn.BpmnDelegateIndexer;
 import net.jakobarndt.bpmnbacklink.core.scan.DelegateScanner;
 import net.jakobarndt.bpmnbacklink.core.scan.DelegateType;
-import net.jakobarndt.bpmnbacklink.core.write.AnnotationWriter;
+import net.jakobarndt.bpmnbacklink.core.write.AnnotationEditor;
+import net.jakobarndt.bpmnbacklink.core.write.AnnotationEditors;
 
 import java.io.IOException;
 import java.io.UncheckedIOException;
@@ -53,7 +54,6 @@ public final class BacklinkProcessor {
     private final BacklinkConfig config;
     private final BpmnDelegateIndexer indexer;
     private final DelegateScanner scanner;
-    private final AnnotationWriter writer;
 
     /**
      * @param config the run configuration; must not be {@code null}
@@ -62,14 +62,14 @@ public final class BacklinkProcessor {
         this.config = Objects.requireNonNull(config, "config");
         this.indexer = new BpmnDelegateIndexer(config.bpmnDirectory(), config.bpmnReferenceRoot());
         this.scanner = new DelegateScanner(config.sourceDirectory());
-        this.writer = new AnnotationWriter();
     }
 
     /**
      * Executes the run.
      *
      * @return the aggregated result
-     * @throws UncheckedIOException if a BPMN or Java file cannot be read or written
+     * @throws UncheckedIOException if a BPMN or delegate source file cannot be
+     *     read or written
      */
     public BacklinkResult run() {
         try {
@@ -81,37 +81,59 @@ public final class BacklinkProcessor {
 
     private BacklinkResult runChecked() throws IOException {
         Map<String, SortedSet<String>> index = indexer.index();
-        List<DelegateType> delegates = scanner.scan();
+        Tally tally = new Tally();
+        for (DelegateType delegate : scanner.scan()) {
+            reconcile(delegate, expectedFor(delegate, index), tally);
+        }
+        return tally.toResult();
+    }
 
-        int updated = 0;
-        int removed = 0;
-        int unchanged = 0;
-        List<BacklinkResult.Drift> drift = new ArrayList<>();
+    private void reconcile(DelegateType delegate, List<String> expected, Tally tally) throws IOException {
+        AnnotationEditor editor = AnnotationEditors.forFile(delegate.sourceFile());
+        List<String> current = editor.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
+        if (expected.equals(current)) {
+            tally.countUnchanged();
+            return;
+        }
+        if (config.mode() == Mode.CHECK) {
+            tally.countDrift(new BacklinkResult.Drift(delegate.sourceFile(), expected, current));
+        } else {
+            editor.write(delegate.sourceFile(), delegate.simpleName(), expected);
+        }
+        if (expected.isEmpty()) {
+            tally.countRemoved();
+        } else {
+            tally.countUpdated();
+        }
+    }
 
-        for (DelegateType delegate : delegates) {
-            List<String> expected = expectedFor(delegate, index);
-            List<String> current = writer.readCurrentValues(delegate.sourceFile(), delegate.simpleName());
+    /** What the run has seen so far, accumulated across the delegates. */
+    private static final class Tally {
 
-            if (expected.equals(current)) {
-                unchanged++;
-                continue;
-            }
+        private final List<BacklinkResult.Drift> drift = new ArrayList<>();
+        private int updated;
+        private int removed;
+        private int unchanged;
 
-            boolean removal = expected.isEmpty();
-            if (config.mode() == Mode.CHECK) {
-                drift.add(new BacklinkResult.Drift(delegate.sourceFile(), expected, current));
-            } else {
-                writer.write(delegate.sourceFile(), delegate.simpleName(), expected);
-            }
-
-            if (removal) {
-                removed++;
-            } else {
-                updated++;
-            }
+        private void countUnchanged() {
+            unchanged++;
         }
 
-        return new BacklinkResult(updated, removed, unchanged, drift);
+        private void countUpdated() {
+            updated++;
+        }
+
+        private void countRemoved() {
+            removed++;
+        }
+
+        private void countDrift(BacklinkResult.Drift found) {
+            drift.add(found);
+        }
+
+        private BacklinkResult toResult() {
+            return new BacklinkResult(updated, removed, unchanged, drift);
+        }
     }
 
     private List<String> expectedFor(DelegateType delegate, Map<String, SortedSet<String>> index) {

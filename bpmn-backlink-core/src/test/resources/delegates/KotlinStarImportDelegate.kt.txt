@@ -1,0 +1,7 @@
+package net.example.delegate
+
+import net.jakobarndt.bpmnbacklink.annotation.*
+import org.camunda.bpm.engine.delegate.JavaDelegate
+
+@CalledFrom("bpmn/processes/old.bpmn")
+class KotlinStarImportDelegate : JavaDelegate

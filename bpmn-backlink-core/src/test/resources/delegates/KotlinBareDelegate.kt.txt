@@ -1,0 +1,4 @@
+class KotlinBareDelegate : JavaDelegate {
+
+    override fun execute(execution: Any) = Unit
+}
