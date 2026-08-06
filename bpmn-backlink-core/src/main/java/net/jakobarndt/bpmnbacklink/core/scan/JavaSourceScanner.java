@@ -18,6 +18,8 @@ package net.jakobarndt.bpmnbacklink.core.scan;
 import com.github.javaparser.StaticJavaParser;
 import com.github.javaparser.ast.CompilationUnit;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
+import com.github.javaparser.ast.expr.Expression;
 import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import net.jakobarndt.bpmnbacklink.core.util.Names;
 
@@ -25,6 +27,7 @@ import java.io.IOException;
 import java.nio.file.Path;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 import java.util.Set;
 
 /**
@@ -56,8 +59,47 @@ public final class JavaSourceScanner implements SourceScanner {
         }
         unit.findAll(ClassOrInterfaceDeclaration.class).stream()
             .filter(JavaSourceScanner::isConcreteDelegate)
-            .forEach(type -> found.add(new DelegateType(sourceFile, type.getNameAsString())));
+            .map(type -> delegateType(sourceFile, type))
+            .forEach(found::add);
         return found;
+    }
+
+    private static DelegateType delegateType(Path sourceFile, ClassOrInterfaceDeclaration type) {
+        String simpleName = type.getNameAsString();
+        String delegateReference = type.getAnnotations().stream()
+            .filter(JavaSourceScanner::namesABean)
+            .map(JavaSourceScanner::literalValue)
+            .flatMap(Optional::stream)
+            .filter(value -> !value.isBlank())
+            .findFirst()
+            .orElseGet(() -> Names.decapitalize(simpleName));
+        return new DelegateType(sourceFile, simpleName, delegateReference);
+    }
+
+    private static boolean namesABean(AnnotationExpr annotation) {
+        return BeanNameAnnotations.contains(Names.simpleName(annotation.getNameAsString()));
+    }
+
+    private static Optional<String> literalValue(AnnotationExpr annotation) {
+        if (annotation.isSingleMemberAnnotationExpr()) {
+            return stringValue(annotation.asSingleMemberAnnotationExpr().getMemberValue());
+        }
+        if (!annotation.isNormalAnnotationExpr()) {
+            return Optional.empty();
+        }
+        return annotation.asNormalAnnotationExpr().getPairs().stream()
+            .filter(pair -> pair.getNameAsString().equals("value"))
+            .map(pair -> pair.getValue())
+            .map(JavaSourceScanner::stringValue)
+            .flatMap(Optional::stream)
+            .findFirst();
+    }
+
+    private static Optional<String> stringValue(Expression expression) {
+        if (!expression.isStringLiteralExpr()) {
+            return Optional.empty();
+        }
+        return Optional.of(expression.asStringLiteralExpr().asString());
     }
 
     private static boolean isConcreteDelegate(ClassOrInterfaceDeclaration type) {

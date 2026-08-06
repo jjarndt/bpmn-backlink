@@ -21,9 +21,12 @@ import org.junit.jupiter.api.io.TempDir;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.UncheckedIOException;
+import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
@@ -73,6 +76,75 @@ class KotlinSourceScannerTest {
         DelegateType found = new DelegateScanner(List.of(sourceRoot)).scan().get(0);
 
         assertEquals("kotlinOrderDelegate", found.delegateReference());
+    }
+
+    @Test
+    void explicitKotlinBeanNamesOverrideTheDefaultReference(@TempDir Path root) throws IOException {
+        Path packageDir = root.resolve("src/main/kotlin/net/example/delegate");
+        Files.createDirectories(packageDir);
+        String source = String.join("\n",
+            "package net.example.delegate",
+            "",
+            "@Component(\"componentBean\")",
+            "class ComponentDelegate : JavaDelegate",
+            "",
+            "@Service(value = \"serviceBean\")",
+            "class ServiceDelegate : JavaDelegate",
+            "",
+            "@jakarta.inject.Named(\"\"\"rawNamedBean\"\"\")",
+            "class NamedDelegate : JavaDelegate",
+            "",
+            "@Component(\"\")",
+            "class BlankDelegate : JavaDelegate",
+            "",
+            "@Component",
+            "class MarkerDelegate : JavaDelegate",
+            "",
+            "@Service(BEAN_NAME)",
+            "class DynamicDelegate : JavaDelegate",
+            "",
+            "@Other(\"otherBean\")",
+            "class OtherDelegate : JavaDelegate",
+            "",
+            "@Component(name = \"ignored\")",
+            "@Named(\"secondAnnotationBean\")",
+            "class SecondAnnotationDelegate : JavaDelegate",
+            "",
+            "@Component(name = \"ignored\")",
+            "class WrongArgumentDelegate : JavaDelegate",
+            "",
+            "@Component(\"prefix-$suffix\")",
+            "class TemplateDelegate : JavaDelegate",
+            "",
+            "@Component(\"prefix-\\$literal\")",
+            "class EscapedDollarDelegate : JavaDelegate",
+            "",
+            "@Component(\"first\" + \"second\")",
+            "class ConcatenatedDelegate : JavaDelegate",
+            "",
+            "@Named(\"\"\"$rawTemplate\"\"\")",
+            "class RawTemplateDelegate : JavaDelegate",
+            "");
+        Files.writeString(packageDir.resolve("NamedDelegates.kt"), source, StandardCharsets.UTF_8);
+        sourceRoot = root.resolve("src/main/kotlin");
+
+        Map<String, String> references = new DelegateScanner(List.of(sourceRoot)).scan().stream()
+            .collect(Collectors.toMap(DelegateType::simpleName, DelegateType::delegateReference));
+
+        assertEquals(Map.ofEntries(
+            Map.entry("ComponentDelegate", "componentBean"),
+            Map.entry("ServiceDelegate", "serviceBean"),
+            Map.entry("NamedDelegate", "rawNamedBean"),
+            Map.entry("BlankDelegate", "blankDelegate"),
+            Map.entry("MarkerDelegate", "markerDelegate"),
+            Map.entry("DynamicDelegate", "dynamicDelegate"),
+            Map.entry("OtherDelegate", "otherDelegate"),
+            Map.entry("SecondAnnotationDelegate", "secondAnnotationBean"),
+            Map.entry("WrongArgumentDelegate", "wrongArgumentDelegate"),
+            Map.entry("TemplateDelegate", "templateDelegate"),
+            Map.entry("EscapedDollarDelegate", "prefix-$literal"),
+            Map.entry("ConcatenatedDelegate", "concatenatedDelegate"),
+            Map.entry("RawTemplateDelegate", "rawTemplateDelegate")), references);
     }
 
     @Test

@@ -31,6 +31,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Maven parameter `sourceDirectory` and Gradle property `sourceDirectory`. Both
   still work: when set explicitly, the named root is the only one scanned.
 
+### Fixed
+
+- Delegate expressions now resolve explicit bean names declared with
+  `@Component("...")`, `@Service("...")` or `@Named("...")` in Java and Kotlin
+  sources. Empty or non-literal annotation values continue to use the default
+  decapitalized class name.
+
 ## [0.1.0] - 2026-06-16
 
 ### Added

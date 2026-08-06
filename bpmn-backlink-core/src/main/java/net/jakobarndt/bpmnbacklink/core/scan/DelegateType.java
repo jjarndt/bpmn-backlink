@@ -20,19 +20,21 @@ import net.jakobarndt.bpmnbacklink.core.util.Names;
 import java.nio.file.Path;
 
 /**
- * A concrete Java delegate type discovered on the source level.
+ * A concrete delegate type discovered on the source level.
  *
- * @param sourceFile the {@code .java} file that declares the delegate
+ * @param sourceFile the source file that declares the delegate
  * @param simpleName the simple type name of the delegate class
+ * @param delegateReference the bean name used for BPMN index lookup
  */
-public record DelegateType(Path sourceFile, String simpleName) {
+public record DelegateType(Path sourceFile, String simpleName, String delegateReference) {
 
     /**
-     * @return the delegate reference used for the BPMN index lookup: the
-     *     camelCased simple name (matching {@code camunda:class} indexing and a
-     *     {@code delegateExpression} bean named after the class)
+     * Creates a delegate that uses Spring's default bean-name convention.
+     *
+     * @param sourceFile the source file that declares the delegate
+     * @param simpleName the simple type name of the delegate class
      */
-    public String delegateReference() {
-        return Names.decapitalize(simpleName);
+    public DelegateType(Path sourceFile, String simpleName) {
+        this(sourceFile, simpleName, Names.decapitalize(simpleName));
     }
 }
